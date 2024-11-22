@@ -1,0 +1,159 @@
+definitions:
+  models.Song:
+    properties:
+      group:
+        type: string
+      id:
+        type: integer
+      link:
+        type: string
+      releaseDate:
+        type: string
+      song:
+        type: string
+    type: object
+  models.Verse:
+    properties:
+      id:
+        type: integer
+      song_id:
+        type: integer
+      text:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /songs:
+    get:
+      consumes:
+      - application/json
+      description: Get songs with filtering and pagination
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Limit per page
+        in: query
+        name: pageSize
+        type: integer
+      - collectionFormat: csv
+        description: Filters
+        in: query
+        items:
+          type: string
+        name: filters
+        type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Song'
+            type: array
+      summary: Get songs with filtering and pagination
+      tags:
+      - songs
+    post:
+      consumes:
+      - application/json
+      description: Add a new song
+      parameters:
+      - description: Song data
+        in: body
+        name: song
+        required: true
+        schema:
+          $ref: '#/definitions/models.Song'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+      summary: Add a new song
+      tags:
+      - songs
+  /songs/{songId}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a song by ID
+      parameters:
+      - description: Song ID
+        in: path
+        name: songId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+      summary: Delete a song
+      tags:
+      - songs
+    patch:
+      consumes:
+      - application/json
+      description: Update a song by ID
+      parameters:
+      - description: Song ID
+        in: path
+        name: songId
+        required: true
+        type: integer
+      - description: Song data
+        in: body
+        name: song
+        required: true
+        schema:
+          $ref: '#/definitions/models.Song'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Song'
+      summary: Update a song
+      tags:
+      - songs
+  /songs/{songId}/text:
+    get:
+      consumes:
+      - application/json
+      description: Get song text with pagination by verses
+      parameters:
+      - description: Song ID
+        in: path
+        name: songId
+        required: true
+        type: integer
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Limit per page
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Verse'
+            type: array
+      summary: Get song text with pagination by verses
+      tags:
+      - songs
+swagger: "2.0"
