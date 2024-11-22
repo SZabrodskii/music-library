@@ -1,15 +1,17 @@
-FROM golang:1.18-alpine
+FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
 
-COPY go.mod ./
-COPY go.sum ./
+COPY go.mod go.sum ./
 RUN go mod download
 
-COPY . ./
+COPY . .
+RUN go build -o gateway ./gateway
 
-RUN go build -o /music-library
+FROM alpine:latest
 
-EXPOSE 8080
+WORKDIR /root/
 
-CMD [ "/music-library" ]
+COPY --from=builder /app/gateway .
+
+CMD ["./gateway"]
