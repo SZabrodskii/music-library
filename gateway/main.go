@@ -6,10 +6,10 @@ import (
 	"github.com/swaggo/gin-swagger"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"music-library/config"
 	"music-library/consumer"
 	_ "music-library/docs"
-	"music-library/handlers"
+	"music-library/gateway/config"
+	"music-library/gateway/handlers"
 )
 
 var logger *zap.Logger

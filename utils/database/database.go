@@ -3,8 +3,8 @@ package database
 import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"music-library/config"
-	"music-library/models"
+	"music-library/gateway/models"
+	"music-library/utils/config"
 )
 
 func InitDB() (*gorm.DB, error) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/go-redis/redis/v8"
 	"go.uber.org/zap"
-	"music-library/config"
+	"music-library/gateway/config"
 	"time"
 )
 
@@ -12,20 +12,31 @@ var logger *zap.Logger
 var rdb *redis.Client
 var localCache map[string]interface{}
 
-func init() {
+func NewCache() *Cache {
 	logger, _ = zap.NewProduction()
 	localCache = make(map[string]interface{})
 	rdb = redis.NewClient(&redis.Options{
 		Addr: config.GetEnv("REDIS_URL"),
 	})
+	return &Cache{
+		Logger:     logger,
+		rdb:        rdb,
+		localCache: localCache,
+	}
 }
 
-func GetFromCache(key string) (interface{}, bool) {
+type Cache struct {
+	Logger     *zap.Logger
+	rdb        *redis.Client
+	localCache map[string]interface{}
+}
+
+func (c *Cache) GetFromCache(key string) (interface{}, bool) {
 	if val, ok := localCache[key]; ok {
 		return val, true
 	}
 	ctx := context.Background()
-	val, err := rdb.Get(ctx, key).Result()
+	val, err := c.rdb.Get(ctx, key).Result()
 	if err == redis.Nil {
 		return nil, false
 	} else if err != nil {
@@ -35,28 +46,28 @@ func GetFromCache(key string) (interface{}, bool) {
 	return val, true
 }
 
-func SetToCache(key string, value interface{}, ttl time.Duration) {
+func (c *Cache) SetToCache(key string, value interface{}, ttl time.Duration) {
 	localCache[key] = value
 	ctx := context.Background()
 
-	err := rdb.Set(ctx, key, value, ttl).Err()
+	err := c.rdb.Set(ctx, key, value, ttl).Err()
 	if err != nil {
 		logger.Error("Failed to set to Redis", zap.Error(err))
 	}
 
 }
 
-func DeleteFromCache(key string) {
+func (c *Cache) DeleteFromCache(key string) {
 	delete(localCache, key)
 	ctx := context.Background()
 
-	err := rdb.Del(ctx, key).Err()
+	err := c.rdb.Del(ctx, key).Err()
 	if err != nil {
 		logger.Error("Failed to delete from Redis", zap.Error(err))
 	}
 }
 
-func ClearCache() {
+func (c *Cache) ClearCache() {
 	localCache = make(map[string]interface{})
 	ctx := context.Background()
 
