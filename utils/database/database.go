@@ -1,10 +1,10 @@
 package database
 
 import (
+	"github.com/SZabrodskii/music-library/song-service/models"
+	"github.com/SZabrodskii/music-library/utils/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"music-library/gateway/models"
-	"music-library/utils/config"
 )
 
 func InitDB() (*gorm.DB, error) {
