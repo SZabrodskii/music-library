@@ -1,41 +1,28 @@
 package handlers
 
 import (
+	"github.com/SZabrodskii/music-library/song-service/models"
+	"github.com/SZabrodskii/music-library/song-service/services"
+	"github.com/SZabrodskii/music-library/utils/cache"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
-	"music-library/cache"
-	"music-library/models"
-	"music-library/services"
 	"net/http"
 	"strings"
 	"time"
 )
 
-var logger *zap.Logger
-
-func init() {
-	logger, _ = zap.NewProduction()
-	defer func(logger *zap.Logger) {
-		err := logger.Sync()
-		if err != nil {
-			logger.Error("Failed to sync logger", zap.Error(err))
-		}
-	}(logger)
-
-}
-
+// GetSongs godoc
 // @Summary Get songs with filtering and pagination
 // @Description Get songs with filtering and pagination
 // @Tags songs
-// @Accept  json
-// @Produce  json
-// @Param   page  query  int  false  "Page number"  default(1)
-// @Param   pageSize  query  int  false  "Limit per page"  default(10)
-// @Param   filters  query  []string  false  "Filters"
+// @Accept json
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param pageSize query int false "Limit per page" default(10)
+// @Param filters query []string false "Filters"
 // @Success 200 {array} models.Song
-// @Router /songs [get]
-
-func GetSongs(c *gin.Context) {
+// @Router /api/v1/songs [get]
+func GetSongs(c *gin.Context, cache *cache.Cache, service *services.SongService, logger *zap.Logger) {
 	page := c.DefaultQuery("page", "1")
 	pageSize := c.DefaultQuery("pageSize", "10")
 	filters := c.QueryArray("filters")
@@ -46,7 +33,7 @@ func GetSongs(c *gin.Context) {
 		return
 	}
 
-	songs, err := services.GetSongs(page, pageSize, filters)
+	songs, err := service.GetSongs(page, pageSize, filters)
 	if err != nil {
 		logger.Error("Failed to get songs", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -57,18 +44,18 @@ func GetSongs(c *gin.Context) {
 	c.JSON(http.StatusOK, songs)
 }
 
+// GetSongText godoc
 // @Summary Get song text with pagination by verses
 // @Description Get song text with pagination by verses
 // @Tags songs
-// @Accept  json
-// @Produce  json
-// @Param   songId  path  int  true  "Song ID"
-// @Param   page  query  int  false  "Page number"  default(1)
-// @Param   pageSize  query  int  false  "Limit per page"  default(10)
+// @Accept json
+// @Produce json
+// @Param songId path int true "Song ID"
+// @Param page query int false "Page number" default(1)
+// @Param pageSize query int false "Limit per page" default(10)
 // @Success 200 {array} models.Verse
-// @Router /songs/{songId}/text [get]
-
-func GetSongText(c *gin.Context) {
+// @Router /api/v1/songs/{songId}/text [get]
+func GetSongText(c *gin.Context, cache *cache.Cache, service *services.SongService, logger *zap.Logger) {
 	songId := c.Param("songId")
 	page := c.DefaultQuery("page", "1")
 	pageSize := c.DefaultQuery("pageSize", "10")
@@ -79,7 +66,7 @@ func GetSongText(c *gin.Context) {
 		return
 	}
 
-	verses, err := services.GetSongText(songId, page, pageSize)
+	verses, err := service.GetSongText(songId, page, pageSize)
 	if err != nil {
 		logger.Error("Failed to get song text", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -90,19 +77,19 @@ func GetSongText(c *gin.Context) {
 	c.JSON(http.StatusOK, verses)
 }
 
+// DeleteSong godoc
 // @Summary Delete a song
 // @Description Delete a song by ID
 // @Tags songs
-// @Accept  json
-// @Produce  json
-// @Param   songId  path  int  true  "Song ID"
+// @Accept json
+// @Produce json
+// @Param songId path int true "Song ID"
 // @Success 204
-// @Router /songs/{songId} [delete]
-
-func DeleteSong(c *gin.Context) {
+// @Router /api/v1/songs/{songId} [delete]
+func DeleteSong(c *gin.Context, cache *cache.Cache, service *services.SongService, logger *zap.Logger) {
 	songId := c.Param("songId")
 
-	if err := services.DeleteSong(songId); err != nil {
+	if err := service.DeleteSong(songId); err != nil {
 		logger.Error("Failed to delete song", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -111,17 +98,17 @@ func DeleteSong(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// UpdateSong godoc
 // @Summary Update a song
 // @Description Update a song by ID
 // @Tags songs
-// @Accept  json
-// @Produce  json
-// @Param   songId  path  int  true  "Song ID"
-// @Param   song  body  models.Song  true  "Song data"
+// @Accept json
+// @Produce json
+// @Param songId path int true "Song ID"
+// @Param song body models.Song true "Song data"
 // @Success 200 {object} models.Song
-// @Router /songs/{songId} [patch]
-
-func UpdateSong(c *gin.Context) {
+// @Router /api/v1/songs/{songId} [patch]
+func UpdateSong(c *gin.Context, cache *cache.Cache, service *services.SongService, logger *zap.Logger) {
 	songId := c.Param("songId")
 	var song models.Song
 	if err := c.ShouldBindJSON(&song); err != nil {
@@ -129,7 +116,7 @@ func UpdateSong(c *gin.Context) {
 		return
 	}
 
-	if err := services.UpdateSong(songId, &song); err != nil {
+	if err := service.UpdateSong(songId, &song); err != nil {
 		logger.Error("Failed to update song", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -137,26 +124,25 @@ func UpdateSong(c *gin.Context) {
 
 	cache.DeleteFromCache("song_" + songId)
 	c.JSON(http.StatusOK, song)
-
 }
 
+// AddSong godoc
 // @Summary Add a new song
 // @Description Add a new song
 // @Tags songs
-// @Accept  json
-// @Produce  json
-// @Param   song  body  models.Song  true  "Song data"
+// @Accept json
+// @Produce json
+// @Param song body models.Song true "Song data"
 // @Success 204
-// @Router /songs [post]
-
-func AddSong(c *gin.Context) {
+// @Router /api/v1/songs [post]
+func AddSong(c *gin.Context, cache *cache.Cache, service *services.SongService, logger *zap.Logger) {
 	var song models.Song
 	if err := c.ShouldBindJSON(&song); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := services.AddSongToQueue(&song); err != nil {
+	if err := service.AddSongToQueue(&song); err != nil {
 		logger.Error("Failed to add song to queue", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
