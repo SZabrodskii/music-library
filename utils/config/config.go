@@ -5,8 +5,8 @@ import (
 	"os"
 )
 
-func LoadConfig() {
-	godotenv.Load()
+func init() {
+	_ = godotenv.Load()
 }
 
 func GetEnv(key string) string {
