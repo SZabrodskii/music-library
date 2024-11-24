@@ -20,6 +20,8 @@ type SongService struct {
 	conn   *amqp.Connection
 }
 
+// methods
+
 func NewSongService(logger *zap.Logger, db *gorm.DB, queue *queue.Queue) *SongService {
 	return &SongService{
 		logger: logger,
