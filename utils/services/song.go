@@ -153,7 +153,6 @@ func (c *Client) DeleteSong(req *DeleteSongRequest) error {
 	if err != nil {
 		return err
 	}
-	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {

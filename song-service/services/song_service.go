@@ -77,7 +77,6 @@ func (s *SongService) DeleteSong(req *DeleteSongRequest) error {
 	if err := s.db.Where("id = ?", req.SongId).Delete(&models.Song{}).Error; err != nil {
 		return err
 	}
-
 	return nil
 }
 
