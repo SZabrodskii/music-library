@@ -23,6 +23,7 @@ func main() {
 			NewLogger,
 			cache.NewCache,
 			config.GetEnv,
+			database.NewPostgresProviderConfig,
 			database.InitDB,
 			queue.NewQueue,
 			services.NewSongService,
