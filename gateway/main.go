@@ -2,16 +2,15 @@ package main
 
 import (
 	"github.com/SZabrodskii/music-library/gateway/handlers"
-	"github.com/SZabrodskii/music-library/song-service/services"
 	"github.com/SZabrodskii/music-library/utils/cache"
 	"github.com/SZabrodskii/music-library/utils/config"
 	"github.com/SZabrodskii/music-library/utils/database"
 	"github.com/SZabrodskii/music-library/utils/queue"
-	"github.com/gin-gonic/gin"
+	"github.com/SZabrodskii/music-library/utils/services"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
-	_ "music-library/gateway/docs"
+	_ "github.com/SZabrodskii/music-library/song-service/migrations"
 )
 
 func main() {
@@ -22,7 +21,7 @@ func main() {
 			config.GetEnv,
 			database.InitDB,
 			queue.NewQueue,
-			services.NewSongService,
+			services.NewClient,
 			handlers.NewRouter,
 		),
 		fx.Invoke(startServer),
@@ -36,6 +35,6 @@ func NewLogger() *zap.Logger {
 	return logger
 }
 
-func startServer(router *gin.Engine) {
-	router.Run(":8080")
+func startServer(router *handlers.Router) {
+	router.Start()
 }
