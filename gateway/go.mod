@@ -4,7 +4,7 @@ go 1.22.9
 
 require (
 	github.com/SZabrodskii/music-library/song-service v0.0.0-20241122210927-36c3766e1aee
-	github.com/SZabrodskii/music-library/utils v0.0.0-20241122210927-36c3766e1aee
+	github.com/SZabrodskii/music-library/utils v0.0.0-20241124192739-322947e67836
 	github.com/gin-gonic/gin v1.10.0
 	github.com/swaggo/swag v1.16.4
 	go.uber.org/fx v1.23.0

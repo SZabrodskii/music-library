@@ -145,3 +145,24 @@ func (c *Client) AddSong(req *AddSongRequest) error {
 	}
 	return nil
 }
+
+func (c *Client) DeleteSong(req *DeleteSongRequest) error {
+	url := fmt.Sprintf("%s/songs/%s", c.BaseURL, req.SongId)
+
+	httpReq, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("failed to delete song: %s", resp.Status)
+	}
+	return nil
+}
