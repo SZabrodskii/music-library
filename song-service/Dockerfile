@@ -5,7 +5,8 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY . .
+COPY ./song-service .
+COPY ./utils ../
 RUN go build -o song-service ./song-service
 
 FROM alpine:latest

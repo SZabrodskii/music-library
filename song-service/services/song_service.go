@@ -2,7 +2,8 @@ package services
 
 import (
 	"encoding/json"
-	"github.com/SZabrodskii/music-library/song-service/models"
+	"fmt"
+	"github.com/SZabrodskii/music-library/utils/models"
 	"github.com/SZabrodskii/music-library/utils/queue"
 	"github.com/streadway/amqp"
 	"go.uber.org/zap"
@@ -27,10 +28,18 @@ func NewSongService(logger *zap.Logger, db *gorm.DB, queue *queue.Queue) *SongSe
 	}
 }
 
-func (s *SongService) GetSongs(page, pageSize string, filters []string) ([]models.Song, error) {
-	var songs []models.Song
-	pageInt, _ := strconv.Atoi(page)
-	pageSizeInt, _ := strconv.Atoi(pageSize)
+type GetSongsRequest struct {
+	Page     string   `json:"page"`
+	PageSize string   `json:"pageSize"`
+	Filters  []string `json:"filters"`
+}
+
+func (s *SongService) GetSongs(req *GetSongsRequest) ([]*models.Song, error) {
+	songs := make([]*models.Song, 0)
+	pageInt, _ := strconv.Atoi(req.Page)
+	pageSizeInt, _ := strconv.Atoi(req.PageSize)
+
+	filters := req.Filters
 	query := s.db.Offset((pageInt - 1) * pageSizeInt).Limit(pageSizeInt)
 	for _, filter := range filters {
 		query = query.Where(filter)
@@ -42,33 +51,56 @@ func (s *SongService) GetSongs(page, pageSize string, filters []string) ([]model
 	return songs, nil
 }
 
-func (s *SongService) GetSongText(songId, page, pageSize string) ([]models.Verse, error) {
-	var verses []models.Verse
-	pageInt, _ := strconv.Atoi(page)
-	pageSizeInt, _ := strconv.Atoi(pageSize)
-	if err := s.db.Where("song_id = ?", songId).Offset((pageInt - 1) * pageSizeInt).Limit(pageSizeInt).Find(&verses).Error; err != nil {
+type GetSongTextRequest struct {
+	SongId   string `json:"songId"`
+	Page     string `json:"page"`
+	PageSize string `json:"pageSize"`
+}
+
+func (s *SongService) GetSongText(req *GetSongTextRequest) ([]*models.Verse, error) {
+	var verses []*models.Verse
+	pageInt, _ := strconv.Atoi(req.Page)
+	pageSizeInt, _ := strconv.Atoi(req.PageSize)
+	if err := s.db.Where("song_id = ?", req.SongId).Offset((pageInt - 1) * pageSizeInt).Limit(pageSizeInt).Find(&verses).Error; err != nil {
 		return nil, err
 	}
 	return verses, nil
 }
 
-func (s *SongService) DeleteSong(songId string) error {
-	if err := s.db.Where("id = ?", songId).Delete(&models.Song{}).Error; err != nil {
+type DeleteSongRequest struct {
+	SongId string `json:"songId"`
+}
+
+func (s *SongService) DeleteSong(req *DeleteSongRequest) error {
+	if err := s.db.Where("id = ?", req.SongId).Delete(&models.Song{}).Error; err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s *SongService) UpdateSong(songId string, song *models.Song) error {
-	if err := s.db.Where("id = ?", songId).Updates(song).Error; err != nil {
-		return err
+type UpdateSongRequest struct {
+	SongID string       `json:"songId"`
+	Song   *models.Song `json:"song"`
+}
+
+func (s *SongService) UpdateSong(req *UpdateSongRequest) error {
+	if err := s.db.Where("id = ?", req.SongID).First(&models.Song{}).Error; err != nil {
+		return fmt.Errorf("song not found: %w", err)
+	}
+
+	if err := s.db.Model(&models.Song{}).Where("id = ?", req.SongID).Updates(req.Song).Error; err != nil {
+		return fmt.Errorf("failed to update song: %w", err)
 	}
 
 	return nil
 }
 
-func (s *SongService) AddSongToQueue(song *models.Song) error {
+type AddSongRequest struct {
+	Song *models.Song `json:"song"`
+}
+
+func (s *SongService) AddSongToQueue(req *AddSongRequest) error {
 	ch, err := s.conn.Channel()
 	if err != nil {
 		return err
@@ -87,7 +119,7 @@ func (s *SongService) AddSongToQueue(song *models.Song) error {
 		return err
 	}
 
-	body, err := json.Marshal(song)
+	body, err := json.Marshal(req.Song)
 	if err != nil {
 		return err
 	}
@@ -219,3 +251,5 @@ func (s *SongService) ConsumeSongQueue() {
 
 	<-forever
 }
+
+//create client that addresses song_service/ It should be in utils

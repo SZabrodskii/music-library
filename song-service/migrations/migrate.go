@@ -2,7 +2,7 @@ package migrations
 
 import (
 	"gorm.io/gorm"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -16,24 +16,24 @@ type Migration struct {
 
 func ApplyMigrations(db *gorm.DB) error {
 	migrationsDir := "migrations"
-	files, err := ioutil.ReadDir(migrationsDir)
+	files, err := os.ReadDir(migrationsDir)
 	if err != nil {
 		return err
 	}
 
-	var migrations []Migration
+	var migrations []*Migration
 	for _, file := range files {
 		if strings.HasSuffix(file.Name(), ".up.sql") {
 			version := strings.TrimSuffix(strings.TrimSuffix(file.Name(), ".up.sql"), "00000")
-			upSQL, err := ioutil.ReadFile(filepath.Join(migrationsDir, file.Name()))
+			upSQL, err := os.ReadFile(filepath.Join(migrationsDir, file.Name()))
 			if err != nil {
 				return err
 			}
-			downSQL, err := ioutil.ReadFile(filepath.Join(migrationsDir, strings.Replace(file.Name(), ".up.sql", ".down.sql", 1)))
+			downSQL, err := os.ReadFile(filepath.Join(migrationsDir, strings.Replace(file.Name(), ".up.sql", ".down.sql", 1)))
 			if err != nil {
 				return err
 			}
-			migrations = append(migrations, Migration{
+			migrations = append(migrations, &Migration{
 				Version: version,
 				UpSQL:   string(upSQL),
 				DownSQL: string(downSQL),
