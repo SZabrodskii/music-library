@@ -2,19 +2,33 @@ package handlers
 
 import (
 	"context"
+	"github.com/SZabrodskii/music-library/song-service/services"
+	"github.com/SZabrodskii/music-library/utils/cache"
+	"github.com/SZabrodskii/music-library/utils/models"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"music-library/song-service/models"
-	"music-library/song-service/services"
-	"music-library/utils/cache"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 )
+
+type SongHandler struct {
+	cache   *cache.Cache
+	service *services.SongService
+	logger  *zap.Logger
+}
+
+func NewSongHandler(cache *cache.Cache, service *services.SongService, logger *zap.Logger) *SongHandler {
+	return &SongHandler{
+		cache:   cache,
+		service: service,
+		logger:  logger,
+	}
+}
 
 // GetSongs godoc
 // @Summary Get songs with filtering and pagination
@@ -27,25 +41,31 @@ import (
 // @Param filters query []string false "Filters"
 // @Success 200 {array} models.Song
 // @Router /songs [get]
-func GetSongs(c *gin.Context, cache *cache.Cache, service *services.SongService, logger *zap.Logger) {
+func (h *SongHandler) GetSongs(c *gin.Context) {
 	page := c.DefaultQuery("page", "1")
 	pageSize := c.DefaultQuery("pageSize", "10")
 	filters := c.QueryArray("filters")
 
+	request := &services.GetSongsRequest{
+		Page:     page,
+		PageSize: pageSize,
+		Filters:  filters,
+	}
+
 	cacheKey := "songs_" + page + "_" + pageSize + "_" + strings.Join(filters, "_")
-	if val, ok := cache.GetFromCache(cacheKey); ok {
+	if val, ok := h.cache.GetFromCache(cacheKey); ok {
 		c.JSON(http.StatusOK, val)
 		return
 	}
 
-	songs, err := service.GetSongs(page, pageSize, filters)
+	songs, err := h.service.GetSongs(request)
 	if err != nil {
-		logger.Error("Failed to get songs", zap.Error(err))
+		h.logger.Error("Failed to get songs", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	cache.SetToCache(cacheKey, songs, time.Minute*5)
+	h.cache.SetToCache(cacheKey, songs, time.Minute*5)
 	c.JSON(http.StatusOK, songs)
 }
 
@@ -60,25 +80,31 @@ func GetSongs(c *gin.Context, cache *cache.Cache, service *services.SongService,
 // @Param pageSize query int false "Limit per page" default(10)
 // @Success 200 {array} models.Verse
 // @Router /songs/{songId}/text [get]
-func GetSongText(c *gin.Context, cache *cache.Cache, service *services.SongService, logger *zap.Logger) {
+func (h *SongHandler) GetSongText(c *gin.Context) {
 	songId := c.Param("songId")
 	page := c.DefaultQuery("page", "1")
 	pageSize := c.DefaultQuery("pageSize", "10")
 
 	cacheKey := "song_text_" + songId + "_" + page + "_" + pageSize
-	if val, ok := cache.GetFromCache(cacheKey); ok {
+	if val, ok := h.cache.GetFromCache(cacheKey); ok {
 		c.JSON(http.StatusOK, val)
 		return
 	}
 
-	verses, err := service.GetSongText(songId, page, pageSize)
+	request := &services.GetSongTextRequest{
+		SongId:   songId,
+		Page:     page,
+		PageSize: pageSize,
+	}
+
+	verses, err := h.service.GetSongText(request)
 	if err != nil {
-		logger.Error("Failed to get song text", zap.Error(err))
+		h.logger.Error("Failed to get song text", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	cache.SetToCache(cacheKey, verses, time.Minute*5)
+	h.cache.SetToCache(cacheKey, verses, time.Minute*5)
 	c.JSON(http.StatusOK, verses)
 }
 
@@ -91,15 +117,18 @@ func GetSongText(c *gin.Context, cache *cache.Cache, service *services.SongServi
 // @Param songId path int true "Song ID"
 // @Success 204
 // @Router /songs/{songId} [delete]
-func DeleteSong(c *gin.Context, cache *cache.Cache, service *services.SongService, logger *zap.Logger) {
+func (h *SongHandler) DeleteSong(c *gin.Context) {
 	songId := c.Param("songId")
+	request := &services.DeleteSongRequest{
+		SongId: songId,
+	}
 
-	if err := service.DeleteSong(songId); err != nil {
-		logger.Error("Failed to delete song", zap.Error(err))
+	if err := h.service.DeleteSong(request); err != nil {
+		h.logger.Error("Failed to delete song", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	cache.DeleteFromCache("song_" + songId)
+	h.cache.DeleteFromCache("song_" + songId)
 	c.Status(http.StatusNoContent)
 }
 
@@ -113,7 +142,7 @@ func DeleteSong(c *gin.Context, cache *cache.Cache, service *services.SongServic
 // @Param song body models.Song true "Song data"
 // @Success 200 {object} models.Song
 // @Router /songs/{songId} [patch]
-func UpdateSong(c *gin.Context, cache *cache.Cache, service *services.SongService, logger *zap.Logger) {
+func (h *SongHandler) UpdateSong(c *gin.Context) {
 	songId := c.Param("songId")
 	var song models.Song
 	if err := c.ShouldBindJSON(&song); err != nil {
@@ -121,13 +150,18 @@ func UpdateSong(c *gin.Context, cache *cache.Cache, service *services.SongServic
 		return
 	}
 
-	if err := service.UpdateSong(songId, &song); err != nil {
-		logger.Error("Failed to update song", zap.Error(err))
+	request := &services.UpdateSongRequest{
+		SongID: songId,
+		Song:   &song,
+	}
+
+	if err := h.service.UpdateSong(request); err != nil {
+		h.logger.Error("Failed to update song", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	cache.DeleteFromCache("song_" + songId)
+	h.cache.DeleteFromCache("song_" + songId)
 	c.JSON(http.StatusOK, song)
 }
 
@@ -140,20 +174,24 @@ func UpdateSong(c *gin.Context, cache *cache.Cache, service *services.SongServic
 // @Param song body models.Song true "Song data"
 // @Success 204
 // @Router /songs [post]
-func AddSong(c *gin.Context, cache *cache.Cache, service *services.SongService, logger *zap.Logger) {
+func (h *SongHandler) AddSong(c *gin.Context) {
 	var song models.Song
 	if err := c.ShouldBindJSON(&song); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := service.AddSongToQueue(&song); err != nil {
-		logger.Error("Failed to add song to queue", zap.Error(err))
+	request := &services.AddSongRequest{
+		Song: &song,
+	}
+
+	if err := h.service.AddSongToQueue(request); err != nil {
+		h.logger.Error("Failed to add song to queue", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	cache.ClearCache()
+	h.cache.ClearCache()
 	c.Status(http.StatusNoContent)
 }
 
@@ -163,23 +201,14 @@ func RegisterHandlers(
 	songService *services.SongService,
 	lifecycle fx.Lifecycle,
 ) {
+	handler := NewSongHandler(cache, songService, logger)
 	r := gin.Default()
 
-	r.GET("/songs", func(c *gin.Context) {
-		GetSongs(c, cache, songService, logger)
-	})
-	r.GET("/songs/:songId/text", func(c *gin.Context) {
-		GetSongText(c, cache, songService, logger)
-	})
-	r.DELETE("/songs/:songId", func(c *gin.Context) {
-		DeleteSong(c, cache, songService, logger)
-	})
-	r.PATCH("/songs/:songId", func(c *gin.Context) {
-		UpdateSong(c, cache, songService, logger)
-	})
-	r.POST("/songs", func(c *gin.Context) {
-		AddSong(c, cache, songService, logger)
-	})
+	r.GET("/songs", handler.GetSongs)
+	r.GET("/songs/:songId/text", handler.GetSongText)
+	r.DELETE("/songs/:songId", handler.DeleteSong)
+	r.PATCH("/songs/:songId", handler.UpdateSong)
+	r.POST("/songs", handler.AddSong)
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
