@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/SZabrodskii/music-library/song-service/services"
 	"github.com/SZabrodskii/music-library/utils/cache"
 	"github.com/SZabrodskii/music-library/utils/models"
@@ -123,11 +124,19 @@ func (h *SongHandler) DeleteSong(c *gin.Context) {
 		SongId: songId,
 	}
 
-	if err := h.service.DeleteSong(request); err != nil {
-		h.logger.Error("Failed to delete song", zap.Error(err))
+	body, err := json.Marshal(request)
+	if err != nil {
+		h.logger.Error("Failed to marshal request", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	if err := h.service.PublishToQueue("delete_song_queue", body); err != nil {
+		h.logger.Error("Failed to publish delete song task", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	h.cache.DeleteFromCache("song_" + songId)
 	c.Status(http.StatusNoContent)
 }
@@ -155,8 +164,15 @@ func (h *SongHandler) UpdateSong(c *gin.Context) {
 		Song:   &song,
 	}
 
-	if err := h.service.UpdateSong(request); err != nil {
-		h.logger.Error("Failed to update song", zap.Error(err))
+	body, err := json.Marshal(request)
+	if err != nil {
+		h.logger.Error("Failed to marshal request", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.service.PublishToQueue("update_song_queue", body); err != nil {
+		h.logger.Error("Failed to publish update song task", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -214,7 +230,9 @@ func RegisterHandlers(
 
 	lifecycle.Append(fx.Hook{
 		OnStart: func(context.Context) error {
-			go songService.ConsumeSongQueue()
+			go songService.ConsumeAddSongQueue()
+			go songService.ConsumeUpdateSongQueue()
+			go songService.ConsumeDeleteSongQueue()
 			return nil
 		},
 		OnStop: func(context.Context) error {

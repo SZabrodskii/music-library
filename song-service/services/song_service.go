@@ -107,12 +107,12 @@ func (s *SongService) AddSongToQueue(req *AddSongRequest) error {
 	defer ch.Close()
 
 	q, err := ch.QueueDeclare(
-		"song_queue", // name
-		false,        // durable
-		false,        // delete when unused
-		false,        // exclusive
-		false,        // no-wait
-		nil,          // arguments
+		"add_song_queue", // name
+		false,            // durable
+		false,            // delete when unused
+		false,            // exclusive
+		false,            // no-wait
+		nil,              // arguments
 	)
 	if err != nil {
 		return err
@@ -137,7 +137,7 @@ func (s *SongService) AddSongToQueue(req *AddSongRequest) error {
 	return nil
 }
 
-func (s *SongService) ConsumeSongQueue() {
+func (s *SongService) ConsumeAddSongQueue() {
 	ch, err := s.conn.Channel()
 	if err != nil {
 		s.logger.Fatal("Failed to open the channel", zap.Error(err))
@@ -145,12 +145,12 @@ func (s *SongService) ConsumeSongQueue() {
 	defer ch.Close()
 
 	q, err := ch.QueueDeclare(
-		"song_queue", // name
-		false,        //durable
-		false,        //delete when unused
-		false,        //exclusive
-		false,        //no-wait
-		nil,          //arguments
+		"add_song_queue", // name
+		false,            //durable
+		false,            //delete when unused
+		false,            //exclusive
+		false,            //no-wait
+		nil,              //arguments
 	)
 
 	if err != nil {
@@ -240,6 +240,120 @@ func (s *SongService) ConsumeSongQueue() {
 			if err := tx.Commit().Error; err != nil {
 				tx.Rollback()
 				s.logger.Error("Failed to commit transaction", zap.Error(err))
+				d.Nack(false, true)
+				continue
+			}
+
+			d.Ack(false)
+		}
+	}()
+
+	<-forever
+}
+
+func (s *SongService) ConsumeUpdateSongQueue() {
+	ch, err := s.conn.Channel()
+	if err != nil {
+		s.logger.Fatal("Failed to open the channel", zap.Error(err))
+	}
+	defer ch.Close()
+
+	q, err := ch.QueueDeclare(
+		"update_song_queue", // name
+		false,               //durable
+		false,               //delete when unused
+		false,               //exclusive
+		false,               //no-wait
+		nil,                 //arguments
+	)
+
+	if err != nil {
+		s.logger.Fatal("Failed to declare a queue", zap.Error(err))
+	}
+
+	msgs, err := ch.Consume(
+		q.Name, //queue
+		"",     //consumer
+		false,  //auto ack
+		false,  //exclusive
+		false,  //no local
+		false,  //no wait
+		nil,    //args
+	)
+	if err != nil {
+		s.logger.Fatal("Failed to register a consumer", zap.Error(err))
+	}
+
+	forever := make(chan bool)
+
+	go func() {
+		for d := range msgs {
+			var req UpdateSongRequest
+			if err := json.Unmarshal(d.Body, &req); err != nil {
+				s.logger.Error("Failed to unmarshal update song request", zap.Error(err))
+				d.Nack(false, true)
+				continue
+			}
+
+			if err := s.UpdateSong(&req); err != nil {
+				s.logger.Error("Failed to update song", zap.Error(err))
+				d.Nack(false, true)
+				continue
+			}
+
+			d.Ack(false)
+		}
+	}()
+
+	<-forever
+}
+
+func (s *SongService) ConsumeDeleteSongQueue() {
+	ch, err := s.conn.Channel()
+	if err != nil {
+		s.logger.Fatal("Failed to open the channel", zap.Error(err))
+	}
+	defer ch.Close()
+
+	q, err := ch.QueueDeclare(
+		"delete_song_queue", // name
+		false,               //durable
+		false,               //delete when unused
+		false,               //exclusive
+		false,               //no-wait
+		nil,                 //arguments
+	)
+
+	if err != nil {
+		s.logger.Fatal("Failed to declare a queue", zap.Error(err))
+	}
+
+	msgs, err := ch.Consume(
+		q.Name, //queue
+		"",     //consumer
+		false,  //auto ack
+		false,  //exclusive
+		false,  //no local
+		false,  //no wait
+		nil,    //args
+	)
+	if err != nil {
+		s.logger.Fatal("Failed to register a consumer", zap.Error(err))
+	}
+
+	forever := make(chan bool)
+
+	go func() {
+		for d := range msgs {
+			var req DeleteSongRequest
+			if err := json.Unmarshal(d.Body, &req); err != nil {
+				s.logger.Error("Failed to unmarshal delete song request", zap.Error(err))
+				d.Nack(false, true)
+				continue
+			}
+
+			if err := s.DeleteSong(&req); err != nil {
+				s.logger.Error("Failed to delete song", zap.Error(err))
 				d.Nack(false, true)
 				continue
 			}
