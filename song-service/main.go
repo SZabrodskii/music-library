@@ -4,10 +4,8 @@ import (
 	"github.com/SZabrodskii/music-library/song-service/handlers"
 	"github.com/SZabrodskii/music-library/song-service/migrations"
 	"github.com/SZabrodskii/music-library/song-service/services"
-	"github.com/SZabrodskii/music-library/utils/cache"
 	"github.com/SZabrodskii/music-library/utils/config"
 	"github.com/SZabrodskii/music-library/utils/providers"
-	"github.com/SZabrodskii/music-library/utils/queue"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -21,11 +19,11 @@ func main() {
 	app := fx.New(
 		fx.Provide(
 			NewLogger,
-			cache.NewCache,
+			providers.NewCacheProvider,
 			config.GetEnv,
 			providers.NewPostgresProviderConfig,
 			providers.InitDB,
-			queue.NewQueue,
+			providers.NewRabbitMQProvider,
 			services.NewSongService,
 			handlers.RegisterHandlers,
 		),
