@@ -216,9 +216,8 @@ func RegisterHandlers(
 
 	lifecycle.Append(fx.Hook{
 		OnStart: func(context.Context) error {
-			go songService.ConsumeAddSongQueue()
-			go songService.ConsumeUpdateSongQueue()
-			go songService.ConsumeDeleteSongQueue()
+			songService.RegisterConsumers()
+			songService.ConsumerManager.StartConsumers()
 			return nil
 		},
 		OnStop: func(context.Context) error {

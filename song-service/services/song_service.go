@@ -15,16 +15,46 @@ import (
 )
 
 type SongService struct {
-	logger *zap.Logger
-	db     *gorm.DB
-	queue  *providers.RabbitMQProvider
+	logger          *zap.Logger
+	db              *gorm.DB
+	queue           *providers.RabbitMQProvider
+	ConsumerManager *ConsumerManager
+}
+
+type ConsumerManager struct {
+	queue    *providers.RabbitMQProvider
+	logger   *zap.Logger
+	db       *gorm.DB
+	handlers map[string]func(amqp.Delivery)
 }
 
 func NewSongService(logger *zap.Logger, db *gorm.DB, queue *providers.RabbitMQProvider) *SongService {
+	consumerManager := NewConsumerManager(logger, db, queue)
 	return &SongService{
-		logger: logger,
-		db:     db,
-		queue:  queue,
+		logger:          logger,
+		db:              db,
+		queue:           queue,
+		ConsumerManager: consumerManager,
+	}
+}
+
+func NewConsumerManager(logger *zap.Logger, db *gorm.DB, queue *providers.RabbitMQProvider) *ConsumerManager {
+	return &ConsumerManager{
+		queue:    queue,
+		logger:   logger,
+		db:       db,
+		handlers: make(map[string]func(amqp.Delivery)),
+	}
+}
+
+func (cm *ConsumerManager) RegisterHandler(queueName string, handler func(amqp.Delivery)) {
+	cm.handlers[queueName] = handler
+	cm.queue.Consume(queueName, handler)
+}
+
+func (cm *ConsumerManager) StartConsumers() {
+	for queueName, handler := range cm.handlers {
+		cm.queue.Consume(queueName, handler)
 	}
 }
 
@@ -115,118 +145,118 @@ func (s *SongService) PublishToQueue(queueName string, data interface{}) error {
 	return s.queue.Publish(queueName, body)
 }
 
-func (s *SongService) ConsumeAddSongQueue() {
-	s.queue.Consume("add_song_queue", func(d amqp.Delivery) {
-		var song models.Song
-		if err := json.Unmarshal(d.Body, &song); err != nil {
-			s.logger.Error("Failed to unmarshal song", zap.Error(err))
-			d.Nack(false, true)
-			return
-		}
+func (s *SongService) handleAddSong(d amqp.Delivery) {
+	var song models.Song
+	if err := json.Unmarshal(d.Body, &song); err != nil {
+		s.logger.Error("Failed to unmarshal song", zap.Error(err))
+		d.Nack(false, false)
+		return
+	}
 
-		apiURL := os.Getenv("API_URL")
-		req, err := http.NewRequest("GET", apiURL, nil)
-		if err != nil {
-			s.logger.Error("Failed to create request", zap.Error(err))
-			d.Nack(false, true)
-			return
-		}
+	apiURL := os.Getenv("API_URL")
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		s.logger.Error("Failed to create request", zap.Error(err))
+		d.Nack(false, true)
+		return
+	}
 
-		q := req.URL.Query()
-		q.Add("group", song.GroupName)
-		q.Add("song", song.SongName)
-		req.URL.RawQuery = q.Encode()
+	q := req.URL.Query()
+	q.Add("group", song.GroupName)
+	q.Add("song", song.SongName)
+	req.URL.RawQuery = q.Encode()
 
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			s.logger.Error("Failed to fetch song details", zap.Error(err))
-			d.Nack(false, true)
-			return
-		}
-		defer resp.Body.Close()
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		s.logger.Error("Failed to fetch song details", zap.Error(err))
+		d.Nack(false, true)
+		return
+	}
+	defer resp.Body.Close()
 
-		if resp.StatusCode != http.StatusOK {
-			s.logger.Error("Failed to fetch song details", zap.String("status", resp.Status))
-			d.Nack(false, true)
-			return
-		}
+	if resp.StatusCode != http.StatusOK {
+		s.logger.Error("Failed to fetch song details", zap.String("status", resp.Status))
+		d.Nack(false, true)
+		return
+	}
 
-		var songDetail models.SongDetail
-		if err := json.NewDecoder(resp.Body).Decode(&songDetail); err != nil {
-			s.logger.Error("Failed to decode song details", zap.Error(err))
-			d.Nack(false, true)
-			return
-		}
+	var songDetail models.SongDetail
+	if err := json.NewDecoder(resp.Body).Decode(&songDetail); err != nil {
+		s.logger.Error("Failed to decode song details", zap.Error(err))
+		d.Nack(false, true)
+		return
+	}
 
-		song.ReleaseDate = songDetail.ReleaseDate
-		song.Link = songDetail.Link
+	song.ReleaseDate = songDetail.ReleaseDate
+	song.Link = songDetail.Link
 
-		tx := s.db.Begin()
-		if err := tx.Create(&song).Error; err != nil {
+	tx := s.db.Begin()
+	if err := tx.Create(&song).Error; err != nil {
+		tx.Rollback()
+		s.logger.Error("Failed to create song", zap.Error(err))
+		d.Nack(false, true)
+		return
+	}
+
+	verses := strings.Split(songDetail.Text, "\n\n")
+	for _, verse := range verses {
+		if err := tx.Create(&models.Verse{SongID: song.ID, Text: verse}).Error; err != nil {
 			tx.Rollback()
-			s.logger.Error("Failed to create song", zap.Error(err))
-			d.Nack(false, true)
+			s.logger.Error("Failed to create verse", zap.Error(err))
+			d.Nack(false, false)
 			return
 		}
+	}
 
-		verses := strings.Split(songDetail.Text, "\n\n")
-		for _, verse := range verses {
-			if err := tx.Create(&models.Verse{SongID: song.ID, Text: verse}).Error; err != nil {
-				tx.Rollback()
-				s.logger.Error("Failed to create verse", zap.Error(err))
-				d.Nack(false, true)
-				return
-			}
-		}
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		s.logger.Error("Failed to commit transaction", zap.Error(err))
+		d.Nack(false, true)
+		return
+	}
 
-		if err := tx.Commit().Error; err != nil {
-			tx.Rollback()
-			s.logger.Error("Failed to commit transaction", zap.Error(err))
-			d.Nack(false, true)
-			return
-		}
-
-		d.Ack(false)
-	})
+	d.Ack(false)
 }
 
-func (s *SongService) ConsumeUpdateSongQueue() {
-	s.queue.Consume("update_song_queue", func(d amqp.Delivery) {
-		var req UpdateSongRequest
-		if err := json.Unmarshal(d.Body, &req); err != nil {
-			s.logger.Error("Failed to unmarshal update song request", zap.Error(err))
-			d.Nack(false, true)
-			return
-		}
+func (s *SongService) handleUpdateSong(d amqp.Delivery) {
+	var req UpdateSongRequest
+	if err := json.Unmarshal(d.Body, &req); err != nil {
+		s.logger.Error("Failed to unmarshal update song request", zap.Error(err))
+		d.Nack(false, false)
+		return
+	}
 
-		if err := s.UpdateSong(&req); err != nil {
-			s.logger.Error("Failed to update song", zap.Error(err))
-			d.Nack(false, true)
-			return
-		}
+	if err := s.UpdateSong(&req); err != nil {
+		s.logger.Error("Failed to update song", zap.Error(err))
+		d.Nack(false, true)
+		return
+	}
 
-		d.Ack(false)
-	})
+	d.Ack(false)
 }
 
-func (s *SongService) ConsumeDeleteSongQueue() {
-	s.queue.Consume("delete_song_queue", func(d amqp.Delivery) {
-		var req DeleteSongRequest
-		if err := json.Unmarshal(d.Body, &req); err != nil {
-			s.logger.Error("Failed to unmarshal delete song request", zap.Error(err))
-			d.Nack(false, true)
-			return
-		}
+func (s *SongService) handleDeleteSong(d amqp.Delivery) {
+	var req DeleteSongRequest
+	if err := json.Unmarshal(d.Body, &req); err != nil {
+		s.logger.Error("Failed to unmarshal delete song request", zap.Error(err))
+		d.Nack(false, false)
+		return
+	}
 
-		if err := s.DeleteSong(&req); err != nil {
-			s.logger.Error("Failed to delete song", zap.Error(err))
-			d.Nack(false, true)
-			return
-		}
+	if err := s.DeleteSong(&req); err != nil {
+		s.logger.Error("Failed to delete song", zap.Error(err))
+		d.Nack(false, true)
+		return
+	}
 
-		d.Ack(false)
-	})
+	d.Ack(false)
+}
+
+func (s *SongService) RegisterConsumers() {
+	s.consumerManager.RegisterHandler("add_song_queue", s.handleAddSong)
+	s.consumerManager.RegisterHandler("update_song_queue", s.handleUpdateSong)
+	s.consumerManager.RegisterHandler("delete_song_queue", s.handleDeleteSong)
 }
 
 //create client that addresses song_service/ It should be in utils
