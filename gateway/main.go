@@ -21,7 +21,7 @@ func main() {
 			config.GetEnv,
 			database.InitDB,
 			queue.NewQueue,
-			services.NewClient,
+			services.NewSongServiceClient,
 			handlers.NewSongHandler,
 			handlers.NewRouter,
 		),
