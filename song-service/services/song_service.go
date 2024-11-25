@@ -17,14 +17,14 @@ import (
 type SongService struct {
 	logger *zap.Logger
 	db     *gorm.DB
-	conn   *amqp.Connection
+	queue  *queue.Queue
 }
 
 func NewSongService(logger *zap.Logger, db *gorm.DB, queue *queue.Queue) *SongService {
 	return &SongService{
 		logger: logger,
 		db:     db,
-		conn:   queue.GetConnection(),
+		queue:  queue,
 	}
 }
 
@@ -100,269 +100,133 @@ type AddSongRequest struct {
 }
 
 func (s *SongService) AddSongToQueue(req *AddSongRequest) error {
-	ch, err := s.conn.Channel()
-	if err != nil {
-		return err
-	}
-	defer ch.Close()
-
-	q, err := ch.QueueDeclare(
-		"add_song_queue", // name
-		false,            // durable
-		false,            // delete when unused
-		false,            // exclusive
-		false,            // no-wait
-		nil,              // arguments
-	)
-	if err != nil {
-		return err
-	}
-
 	body, err := json.Marshal(req.Song)
 	if err != nil {
 		return err
 	}
+	return s.queue.Publish("add_song_queue", body)
+}
 
-	if err := ch.Publish(
-		"",     // exchange
-		q.Name, //routing key
-		false,  //mandatory
-		false,  //immediate
-		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        body,
-		}); err != nil {
+func (s *SongService) PublishToQueue(queueName string, data interface{}) error {
+	body, err := json.Marshal(data)
+	if err != nil {
 		return err
 	}
-	return nil
+	return s.queue.Publish(queueName, body)
 }
 
 func (s *SongService) ConsumeAddSongQueue() {
-	ch, err := s.conn.Channel()
-	if err != nil {
-		s.logger.Fatal("Failed to open the channel", zap.Error(err))
-	}
-	defer ch.Close()
-
-	q, err := ch.QueueDeclare(
-		"add_song_queue", // name
-		false,            //durable
-		false,            //delete when unused
-		false,            //exclusive
-		false,            //no-wait
-		nil,              //arguments
-	)
-
-	if err != nil {
-		s.logger.Fatal("Failed to declare a queue", zap.Error(err))
-	}
-
-	msgs, err := ch.Consume(
-		q.Name, //queue
-		"",     //consumer
-		false,  //auto ack
-		false,  //exclusive
-		false,  //no local
-		false,  //no wait
-		nil,    //args
-	)
-	if err != nil {
-		s.logger.Fatal("Failed to register a consumer", zap.Error(err))
-	}
-
-	forever := make(chan bool)
-
-	go func() {
-		for d := range msgs {
-			var song models.Song
-			if err := json.Unmarshal(d.Body, &song); err != nil {
-				s.logger.Error("Failed to unmarshal song", zap.Error(err))
-				d.Nack(false, true)
-				continue
-			}
-
-			apiURL := os.Getenv("API_URL")
-			req, err := http.NewRequest("GET", apiURL, nil)
-			if err != nil {
-				s.logger.Error("Failed to create request", zap.Error(err))
-				d.Nack(false, true)
-				continue
-			}
-
-			q := req.URL.Query()
-			q.Add("group", song.GroupName)
-			q.Add("song", song.SongName)
-			req.URL.RawQuery = q.Encode()
-
-			client := &http.Client{}
-			resp, err := client.Do(req)
-			if err != nil {
-				s.logger.Error("Failed to fetch song details", zap.Error(err))
-				d.Nack(false, true)
-				continue
-			}
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusOK {
-				s.logger.Error("Failed to fetch song details", zap.String("status", resp.Status))
-				d.Nack(false, true)
-				continue
-			}
-
-			var songDetail models.SongDetail
-			if err := json.NewDecoder(resp.Body).Decode(&songDetail); err != nil {
-				s.logger.Error("Failed to decode song details", zap.Error(err))
-				d.Nack(false, true)
-				continue
-			}
-
-			song.ReleaseDate = songDetail.ReleaseDate
-			song.Link = songDetail.Link
-
-			tx := s.db.Begin()
-			if err := tx.Create(&song).Error; err != nil {
-				tx.Rollback()
-				s.logger.Error("Failed to create song", zap.Error(err))
-				d.Nack(false, true)
-				continue
-			}
-
-			verses := strings.Split(songDetail.Text, "\n\n")
-			for _, verse := range verses {
-				if err := tx.Create(&models.Verse{SongID: song.ID, Text: verse}).Error; err != nil {
-					tx.Rollback()
-					s.logger.Error("Failed to create verse", zap.Error(err))
-					d.Nack(false, true)
-					continue
-				}
-			}
-
-			if err := tx.Commit().Error; err != nil {
-				tx.Rollback()
-				s.logger.Error("Failed to commit transaction", zap.Error(err))
-				d.Nack(false, true)
-				continue
-			}
-
-			d.Ack(false)
+	s.queue.Consume("add_song_queue", func(d amqp.Delivery) {
+		var song models.Song
+		if err := json.Unmarshal(d.Body, &song); err != nil {
+			s.logger.Error("Failed to unmarshal song", zap.Error(err))
+			d.Nack(false, true)
+			return
 		}
-	}()
 
-	<-forever
+		apiURL := os.Getenv("API_URL")
+		req, err := http.NewRequest("GET", apiURL, nil)
+		if err != nil {
+			s.logger.Error("Failed to create request", zap.Error(err))
+			d.Nack(false, true)
+			return
+		}
+
+		q := req.URL.Query()
+		q.Add("group", song.GroupName)
+		q.Add("song", song.SongName)
+		req.URL.RawQuery = q.Encode()
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			s.logger.Error("Failed to fetch song details", zap.Error(err))
+			d.Nack(false, true)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			s.logger.Error("Failed to fetch song details", zap.String("status", resp.Status))
+			d.Nack(false, true)
+			return
+		}
+
+		var songDetail models.SongDetail
+		if err := json.NewDecoder(resp.Body).Decode(&songDetail); err != nil {
+			s.logger.Error("Failed to decode song details", zap.Error(err))
+			d.Nack(false, true)
+			return
+		}
+
+		song.ReleaseDate = songDetail.ReleaseDate
+		song.Link = songDetail.Link
+
+		tx := s.db.Begin()
+		if err := tx.Create(&song).Error; err != nil {
+			tx.Rollback()
+			s.logger.Error("Failed to create song", zap.Error(err))
+			d.Nack(false, true)
+			return
+		}
+
+		verses := strings.Split(songDetail.Text, "\n\n")
+		for _, verse := range verses {
+			if err := tx.Create(&models.Verse{SongID: song.ID, Text: verse}).Error; err != nil {
+				tx.Rollback()
+				s.logger.Error("Failed to create verse", zap.Error(err))
+				d.Nack(false, true)
+				return
+			}
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			tx.Rollback()
+			s.logger.Error("Failed to commit transaction", zap.Error(err))
+			d.Nack(false, true)
+			return
+		}
+
+		d.Ack(false)
+	})
 }
 
 func (s *SongService) ConsumeUpdateSongQueue() {
-	ch, err := s.conn.Channel()
-	if err != nil {
-		s.logger.Fatal("Failed to open the channel", zap.Error(err))
-	}
-	defer ch.Close()
-
-	q, err := ch.QueueDeclare(
-		"update_song_queue", // name
-		false,               //durable
-		false,               //delete when unused
-		false,               //exclusive
-		false,               //no-wait
-		nil,                 //arguments
-	)
-
-	if err != nil {
-		s.logger.Fatal("Failed to declare a queue", zap.Error(err))
-	}
-
-	msgs, err := ch.Consume(
-		q.Name, //queue
-		"",     //consumer
-		false,  //auto ack
-		false,  //exclusive
-		false,  //no local
-		false,  //no wait
-		nil,    //args
-	)
-	if err != nil {
-		s.logger.Fatal("Failed to register a consumer", zap.Error(err))
-	}
-
-	forever := make(chan bool)
-
-	go func() {
-		for d := range msgs {
-			var req UpdateSongRequest
-			if err := json.Unmarshal(d.Body, &req); err != nil {
-				s.logger.Error("Failed to unmarshal update song request", zap.Error(err))
-				d.Nack(false, true)
-				continue
-			}
-
-			if err := s.UpdateSong(&req); err != nil {
-				s.logger.Error("Failed to update song", zap.Error(err))
-				d.Nack(false, true)
-				continue
-			}
-
-			d.Ack(false)
+	s.queue.Consume("update_song_queue", func(d amqp.Delivery) {
+		var req UpdateSongRequest
+		if err := json.Unmarshal(d.Body, &req); err != nil {
+			s.logger.Error("Failed to unmarshal update song request", zap.Error(err))
+			d.Nack(false, true)
+			return
 		}
-	}()
 
-	<-forever
+		if err := s.UpdateSong(&req); err != nil {
+			s.logger.Error("Failed to update song", zap.Error(err))
+			d.Nack(false, true)
+			return
+		}
+
+		d.Ack(false)
+	})
 }
 
 func (s *SongService) ConsumeDeleteSongQueue() {
-	ch, err := s.conn.Channel()
-	if err != nil {
-		s.logger.Fatal("Failed to open the channel", zap.Error(err))
-	}
-	defer ch.Close()
-
-	q, err := ch.QueueDeclare(
-		"delete_song_queue", // name
-		false,               //durable
-		false,               //delete when unused
-		false,               //exclusive
-		false,               //no-wait
-		nil,                 //arguments
-	)
-
-	if err != nil {
-		s.logger.Fatal("Failed to declare a queue", zap.Error(err))
-	}
-
-	msgs, err := ch.Consume(
-		q.Name, //queue
-		"",     //consumer
-		false,  //auto ack
-		false,  //exclusive
-		false,  //no local
-		false,  //no wait
-		nil,    //args
-	)
-	if err != nil {
-		s.logger.Fatal("Failed to register a consumer", zap.Error(err))
-	}
-
-	forever := make(chan bool)
-
-	go func() {
-		for d := range msgs {
-			var req DeleteSongRequest
-			if err := json.Unmarshal(d.Body, &req); err != nil {
-				s.logger.Error("Failed to unmarshal delete song request", zap.Error(err))
-				d.Nack(false, true)
-				continue
-			}
-
-			if err := s.DeleteSong(&req); err != nil {
-				s.logger.Error("Failed to delete song", zap.Error(err))
-				d.Nack(false, true)
-				continue
-			}
-
-			d.Ack(false)
+	s.queue.Consume("delete_song_queue", func(d amqp.Delivery) {
+		var req DeleteSongRequest
+		if err := json.Unmarshal(d.Body, &req); err != nil {
+			s.logger.Error("Failed to unmarshal delete song request", zap.Error(err))
+			d.Nack(false, true)
+			return
 		}
-	}()
 
-	<-forever
+		if err := s.DeleteSong(&req); err != nil {
+			s.logger.Error("Failed to delete song", zap.Error(err))
+			d.Nack(false, true)
+			return
+		}
+
+		d.Ack(false)
+	})
 }
 
 //create client that addresses song_service/ It should be in utils

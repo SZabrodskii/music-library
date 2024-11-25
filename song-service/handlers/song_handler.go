@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"github.com/SZabrodskii/music-library/song-service/services"
 	"github.com/SZabrodskii/music-library/utils/cache"
 	"github.com/SZabrodskii/music-library/utils/models"
@@ -124,14 +124,7 @@ func (h *SongHandler) DeleteSong(c *gin.Context) {
 		SongId: songId,
 	}
 
-	body, err := json.Marshal(request)
-	if err != nil {
-		h.logger.Error("Failed to marshal request", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := h.service.PublishToQueue("delete_song_queue", body); err != nil {
+	if err := h.service.PublishToQueue("delete_song_queue", request); err != nil {
 		h.logger.Error("Failed to publish delete song task", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -164,14 +157,7 @@ func (h *SongHandler) UpdateSong(c *gin.Context) {
 		Song:   &song,
 	}
 
-	body, err := json.Marshal(request)
-	if err != nil {
-		h.logger.Error("Failed to marshal request", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := h.service.PublishToQueue("update_song_queue", body); err != nil {
+	if err := h.service.PublishToQueue("update_song_queue", request); err != nil {
 		h.logger.Error("Failed to publish update song task", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -245,7 +231,7 @@ func RegisterHandlers(
 		port = "8080"
 	}
 	go func() {
-		if err := r.Run(":" + port); err != nil && err != http.ErrServerClosed {
+		if err := r.Run(":" + port); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Fatal("Failed to start server", zap.Error(err))
 		}
 	}()
