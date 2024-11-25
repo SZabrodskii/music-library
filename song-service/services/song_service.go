@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/SZabrodskii/music-library/utils/models"
-	"github.com/SZabrodskii/music-library/utils/queue"
+	"github.com/SZabrodskii/music-library/utils/providers"
 	"github.com/streadway/amqp"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -17,10 +17,10 @@ import (
 type SongService struct {
 	logger *zap.Logger
 	db     *gorm.DB
-	queue  *queue.Queue
+	queue  *providers.RabbitMQProvider
 }
 
-func NewSongService(logger *zap.Logger, db *gorm.DB, queue *queue.Queue) *SongService {
+func NewSongService(logger *zap.Logger, db *gorm.DB, queue *providers.RabbitMQProvider) *SongService {
 	return &SongService{
 		logger: logger,
 		db:     db,
