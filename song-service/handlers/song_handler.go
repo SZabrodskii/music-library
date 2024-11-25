@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"github.com/SZabrodskii/music-library/song-service/services"
-	"github.com/SZabrodskii/music-library/utils/cache"
 	"github.com/SZabrodskii/music-library/utils/models"
+	"github.com/SZabrodskii/music-library/utils/providers"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -18,12 +18,12 @@ import (
 )
 
 type SongHandler struct {
-	cache   *cache.Cache
+	cache   *providers.CacheProvider
 	service *services.SongService
 	logger  *zap.Logger
 }
 
-func NewSongHandler(cache *cache.Cache, service *services.SongService, logger *zap.Logger) *SongHandler {
+func NewSongHandler(cache *providers.CacheProvider, service *services.SongService, logger *zap.Logger) *SongHandler {
 	return &SongHandler{
 		cache:   cache,
 		service: service,
@@ -199,7 +199,7 @@ func (h *SongHandler) AddSong(c *gin.Context) {
 
 func RegisterHandlers(
 	logger *zap.Logger,
-	cache *cache.Cache,
+	cache *providers.Cache,
 	songService *services.SongService,
 	lifecycle fx.Lifecycle,
 ) {
