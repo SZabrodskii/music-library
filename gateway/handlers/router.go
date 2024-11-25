@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"github.com/SZabrodskii/music-library/song-service/services"
 	"github.com/SZabrodskii/music-library/utils/cache"
 	"github.com/SZabrodskii/music-library/utils/middleware"
 	"github.com/gin-gonic/gin"
@@ -12,7 +11,7 @@ type Router struct {
 	engine *gin.Engine
 }
 
-func NewRouter(cache *cache.Cache, client *services.Client, logger *zap.Logger, songHandler *SongHandler) *Router {
+func NewRouter(cache *cache.Cache, logger *zap.Logger, songHandler *SongHandler) *Router {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(func(ctx *gin.Context) {
