@@ -1,4 +1,4 @@
-package queue
+package providers
 
 import (
 	"github.com/SZabrodskii/music-library/utils/config"
@@ -6,13 +6,13 @@ import (
 	"go.uber.org/zap"
 )
 
-type Queue struct {
-	logger *zap.Logger
-	conn   *amqp.Connection
-	ch     *amqp.Channel
+type RabbitMQProvider struct {
+	Logger *zap.Logger
+	Conn   *amqp.Connection
+	Ch     *amqp.Channel
 }
 
-func NewQueue(logger *zap.Logger) *Queue {
+func NewRabbitMQProvider(logger *zap.Logger) *RabbitMQProvider {
 	conn, err := amqp.Dial(config.GetEnv("RABBITMQ_URL"))
 	if err != nil {
 		logger.Fatal("Failed to connect to RabbitMQ", zap.Error(err))
@@ -21,23 +21,23 @@ func NewQueue(logger *zap.Logger) *Queue {
 	if err != nil {
 		logger.Fatal("Failed to open a channel", zap.Error(err))
 	}
-	return &Queue{
-		logger: logger,
-		conn:   conn,
-		ch:     ch,
+	return &RabbitMQProvider{
+		Logger: logger,
+		Conn:   conn,
+		Ch:     ch,
 	}
 }
 
-func (q *Queue) GetConnection() *amqp.Connection {
-	return q.conn
+func (r *RabbitMQProvider) GetConnection() *amqp.Connection {
+	return r.Conn
 }
 
-func (q *Queue) GetChannel() *amqp.Channel {
-	return q.ch
+func (r *RabbitMQProvider) GetChannel() *amqp.Channel {
+	return r.Ch
 }
 
-func (q *Queue) Publish(queueName string, body []byte) error {
-	err := q.ch.Publish(
+func (r *RabbitMQProvider) Publish(queueName string, body []byte) error {
+	err := r.Ch.Publish(
 		"",        // exchange
 		queueName, // routing key
 		false,     // mandatory
@@ -47,14 +47,14 @@ func (q *Queue) Publish(queueName string, body []byte) error {
 			Body:        body,
 		})
 	if err != nil {
-		q.logger.Error("Failed to publish a message", zap.Error(err))
+		r.Logger.Error("Failed to publish a message", zap.Error(err))
 		return err
 	}
 	return nil
 }
 
-func (q *Queue) Consume(queueName string, consumer func(d amqp.Delivery)) error {
-	msgs, err := q.ch.Consume(
+func (r *RabbitMQProvider) Consume(queueName string, consumer func(d amqp.Delivery)) error {
+	msgs, err := r.Ch.Consume(
 		queueName, // queue
 		"",        // consumer
 		true,      // auto-ack
@@ -64,7 +64,7 @@ func (q *Queue) Consume(queueName string, consumer func(d amqp.Delivery)) error 
 		nil,       // args
 	)
 	if err != nil {
-		q.logger.Error("Failed to register a consumer", zap.Error(err))
+		r.Logger.Error("Failed to register a consumer", zap.Error(err))
 		return err
 	}
 
