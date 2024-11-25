@@ -12,16 +12,15 @@ type Router struct {
 	engine *gin.Engine
 }
 
-func NewRouter(cache *cache.Cache, client *services.Client, logger *zap.Logger) *Router {
+func NewRouter(cache *cache.Cache, client *services.Client, logger *zap.Logger, songHandler *SongHandler) *Router {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(func(ctx *gin.Context) {
-		// Add time.Since to logger
+
 		ctx.Next()
 		logger.Info("New request", zap.String("method", ctx.Request.Method), zap.String("path", ctx.Request.URL.Path), zap.Any("query", ctx.Request.URL.Query()))
 	})
 	router.Use(middleware.CacheMiddleware(cache))
-	songHandler := NewSongHandler(cache, client, logger)
 
 	router.GET("/api/v1/songs", songHandler.GetSongs)
 	router.GET("/api/v1/songs/:songId/text", songHandler.GetSongText)
