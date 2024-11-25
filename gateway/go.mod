@@ -67,3 +67,5 @@ require (
 	gorm.io/driver/postgres v1.5.10 // indirect
 	gorm.io/gorm v1.25.12 // indirect
 )
+
+replace github.com/SZabrodskii/music-library/utils v0.0.0 => ../utils
