@@ -41,19 +41,19 @@ type AddSongRequest struct {
 	Song models.Song `json:"song"`
 }
 
-type Client struct {
+type SongServiceClient struct {
 	BaseURL    string
 	httpClient *http.Client
 }
 
-func NewClient(baseURL string) *Client {
-	return &Client{
+func NewSongServiceClient(baseURL string) *SongServiceClient {
+	return &SongServiceClient{
 		BaseURL:    baseURL,
 		httpClient: &http.Client{},
 	}
 }
 
-func (c *Client) GetSongs(req *GetSongsRequest) (*GetSongsResponse, error) {
+func (c *SongServiceClient) GetSongs(req *GetSongsRequest) (*GetSongsResponse, error) {
 	url := fmt.Sprintf("%s/songs?page=%s&pageSize=%s", c.BaseURL, req.Page, req.PageSize)
 	for _, filter := range req.Filters {
 		url += "&filters=" + filter
@@ -76,7 +76,7 @@ func (c *Client) GetSongs(req *GetSongsRequest) (*GetSongsResponse, error) {
 	return &response, nil
 }
 
-func (c *Client) GetSongText(req *GetSongTextRequest) (*GetSongTextResponse, error) {
+func (c *SongServiceClient) GetSongText(req *GetSongTextRequest) (*GetSongTextResponse, error) {
 	url := fmt.Sprintf("%s/songs/%s/text?page=%s&pageSize=%s", c.BaseURL, req.SongId, req.Page, req.PageSize)
 
 	resp, err := c.httpClient.Get(url)
@@ -96,7 +96,7 @@ func (c *Client) GetSongText(req *GetSongTextRequest) (*GetSongTextResponse, err
 	return &response, nil
 }
 
-func (c *Client) UpdateSong(req *UpdateSongRequest) error {
+func (c *SongServiceClient) UpdateSong(req *UpdateSongRequest) error {
 	url := fmt.Sprintf("%s/songs/%s", c.BaseURL, req.SongID)
 	body, err := json.Marshal(req.Song)
 	if err != nil {
@@ -121,7 +121,7 @@ func (c *Client) UpdateSong(req *UpdateSongRequest) error {
 	return nil
 }
 
-func (c *Client) AddSong(req *AddSongRequest) error {
+func (c *SongServiceClient) AddSong(req *AddSongRequest) error {
 	url := fmt.Sprintf("%s/songs", c.BaseURL)
 	body, err := json.Marshal(req.Song)
 	if err != nil {
@@ -146,7 +146,7 @@ func (c *Client) AddSong(req *AddSongRequest) error {
 	return nil
 }
 
-func (c *Client) DeleteSong(req *DeleteSongRequest) error {
+func (c *SongServiceClient) DeleteSong(req *DeleteSongRequest) error {
 	url := fmt.Sprintf("%s/songs/%s", c.BaseURL, req.SongId)
 
 	httpReq, err := http.NewRequest("DELETE", url, nil)
