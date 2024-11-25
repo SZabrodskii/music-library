@@ -5,6 +5,7 @@ import (
 	"github.com/SZabrodskii/music-library/utils/middleware"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+	"time"
 )
 
 type Router struct {
@@ -15,9 +16,15 @@ func NewRouter(cache *cache.Cache, logger *zap.Logger, songHandler *SongHandler)
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(func(ctx *gin.Context) {
-
+		start := time.Now()
 		ctx.Next()
-		logger.Info("New request", zap.String("method", ctx.Request.Method), zap.String("path", ctx.Request.URL.Path), zap.Any("query", ctx.Request.URL.Query()))
+		duration := time.Since(start)
+		logger.Info("Request completed",
+			zap.String("method", ctx.Request.Method),
+			zap.String("path", ctx.Request.URL.Path),
+			zap.Any("query", ctx.Request.URL.Query()),
+			zap.Duration("duration", duration),
+		)
 	})
 	router.Use(middleware.CacheMiddleware(cache))
 
