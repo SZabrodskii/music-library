@@ -199,7 +199,7 @@ func (h *SongHandler) AddSong(c *gin.Context) {
 
 func RegisterHandlers(
 	logger *zap.Logger,
-	cache *providers.Cache,
+	cache *providers.CacheProvider,
 	songService *services.SongService,
 	lifecycle fx.Lifecycle,
 ) {
