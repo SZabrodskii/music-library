@@ -11,11 +11,11 @@ import (
 
 type SongHandler struct {
 	cache  *cache.Cache
-	client *services.Client
+	client *services.SongServiceClient
 	logger *zap.Logger
 }
 
-func NewSongHandler(cache *cache.Cache, client *services.Client, logger *zap.Logger) *SongHandler {
+func NewSongHandler(cache *cache.Cache, client *services.SongServiceClient, logger *zap.Logger) *SongHandler {
 	return &SongHandler{
 		cache:  cache,
 		client: client,
