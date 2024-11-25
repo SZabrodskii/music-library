@@ -6,7 +6,7 @@ import (
 	"github.com/SZabrodskii/music-library/song-service/services"
 	"github.com/SZabrodskii/music-library/utils/cache"
 	"github.com/SZabrodskii/music-library/utils/config"
-	"github.com/SZabrodskii/music-library/utils/database"
+	"github.com/SZabrodskii/music-library/utils/providers"
 	"github.com/SZabrodskii/music-library/utils/queue"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -23,8 +23,8 @@ func main() {
 			NewLogger,
 			cache.NewCache,
 			config.GetEnv,
-			database.NewPostgresProviderConfig,
-			database.InitDB,
+			providers.NewPostgresProviderConfig,
+			providers.InitDB,
 			queue.NewQueue,
 			services.NewSongService,
 			handlers.RegisterHandlers,

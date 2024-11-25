@@ -1,4 +1,4 @@
-package database
+package providers
 
 import (
 	"github.com/SZabrodskii/music-library/utils/config"
