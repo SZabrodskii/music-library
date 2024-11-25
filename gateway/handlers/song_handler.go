@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"github.com/SZabrodskii/music-library/utils/cache"
 	"github.com/SZabrodskii/music-library/utils/models"
+	"github.com/SZabrodskii/music-library/utils/providers"
 	"github.com/SZabrodskii/music-library/utils/services"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -10,12 +10,12 @@ import (
 )
 
 type SongHandler struct {
-	cache  *cache.Cache
+	cache  *providers.CacheProvider
 	client *services.SongServiceClient
 	logger *zap.Logger
 }
 
-func NewSongHandler(cache *cache.Cache, client *services.SongServiceClient, logger *zap.Logger) *SongHandler {
+func NewSongHandler(cache *providers.CacheProvider, client *services.SongServiceClient, logger *zap.Logger) *SongHandler {
 	return &SongHandler{
 		cache:  cache,
 		client: client,
