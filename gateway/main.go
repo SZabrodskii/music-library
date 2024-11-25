@@ -22,6 +22,7 @@ func main() {
 			database.InitDB,
 			queue.NewQueue,
 			services.NewClient,
+			handlers.NewSongHandler,
 			handlers.NewRouter,
 		),
 		fx.Invoke(startServer),
