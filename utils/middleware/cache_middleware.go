@@ -1,13 +1,13 @@
 package middleware
 
 import (
-	"github.com/SZabrodskii/music-library/utils/cache"
+	"github.com/SZabrodskii/music-library/utils/providers"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"time"
 )
 
-func CacheMiddleware(cache *cache.Cache) gin.HandlerFunc {
+func CacheMiddleware(cache *providers.CacheProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cacheKey := generateCacheKey(c)
 		if val, ok := cache.GetFromCache(cacheKey); ok {
