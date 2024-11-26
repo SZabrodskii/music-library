@@ -4,8 +4,8 @@ import (
 	"github.com/SZabrodskii/music-library/song-service/handlers"
 	"github.com/SZabrodskii/music-library/song-service/migrations"
 	"github.com/SZabrodskii/music-library/song-service/services"
-	"github.com/SZabrodskii/music-library/utils/config"
 	"github.com/SZabrodskii/music-library/utils/providers"
+	"github.com/joho/godotenv"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -13,10 +13,10 @@ import (
 )
 
 func main() {
+
 	app := fx.New(
 		fx.Provide(
 			NewLogger,
-			config.GetEnv,
 			providers.NewRedisProviderConfig,
 			providers.NewRedisProvider,
 			providers.NewCacheProvider,
@@ -42,5 +42,11 @@ func NewLogger() *zap.Logger {
 func applyMigrations(db *gorm.DB) {
 	if err := migrations.ApplyMigrations(db); err != nil {
 		log.Fatalf("Failed to apply migrations: %v", err)
+	}
+}
+
+func loadEnv() {
+	if err := godotenv.Load("../postgres.env"); err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
 	}
 }
