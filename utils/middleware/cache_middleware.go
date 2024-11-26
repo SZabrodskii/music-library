@@ -4,6 +4,7 @@ import (
 	"github.com/SZabrodskii/music-library/utils/providers"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -26,5 +27,10 @@ func CacheMiddleware(cache *providers.CacheProvider) gin.HandlerFunc {
 }
 
 func generateCacheKey(c *gin.Context) string {
-	return c.Request.Method + ":" + c.Request.URL.Path + ":" + c.Request.URL.RawQuery
+	query := c.Request.URL.Query()
+	page := query.Get("page")
+	pageSize := query.Get("pageSize")
+	filters := query["filters"]
+	filterString := strings.Join(filters, "_")
+	return "songs_" + page + "_" + pageSize + "_" + filterString
 }
