@@ -10,24 +10,25 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"log"
-	"net/http"
-	"net/http/httputil"
-	"net/url"
 )
 
 func main() {
 	app := fx.New(
 		fx.Provide(
 			NewLogger,
-			providers.NewCacheProvider,
 			config.GetEnv,
-			providers.NewPostgresProviderConfig,
-			providers.InitDB,
+			providers.NewRedisProviderConfig,
+			providers.NewRedisProvider,
+			providers.NewCacheProvider,
+			providers.NewRabbitMQProviderConfig,
 			providers.NewRabbitMQProvider,
+			providers.NewPostgresProviderConfig,
+			providers.NewPostgresProvider,
+			services.NewSongServiceConfig,
 			services.NewSongService,
 			handlers.RegisterHandlers,
 		),
-		fx.Invoke(applyMigrations, startReverseProxy),
+		fx.Invoke(applyMigrations),
 	)
 
 	app.Run()
@@ -41,20 +42,5 @@ func NewLogger() *zap.Logger {
 func applyMigrations(db *gorm.DB) {
 	if err := migrations.ApplyMigrations(db); err != nil {
 		log.Fatalf("Failed to apply migrations: %v", err)
-	}
-}
-
-func startReverseProxy(logger *zap.Logger) {
-	target, err := url.Parse("http://song-service:8081")
-	if err != nil {
-		logger.Fatal("Failed to parse target URL", zap.Error(err))
-	}
-
-	proxy := httputil.NewSingleHostReverseProxy(target)
-
-	http.Handle("/", proxy)
-	logger.Info("Starting reverse proxy")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
-		logger.Fatal("Failed to start reverse proxy", zap.Error(err))
 	}
 }
