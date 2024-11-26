@@ -14,11 +14,22 @@ import (
 	"strings"
 )
 
+type SongServiceConfig struct {
+	APIURL string
+}
+
+func NewSongServiceConfig() *SongServiceConfig {
+	return &SongServiceConfig{
+		APIURL: os.Getenv("API_URL"),
+	}
+}
+
 type SongService struct {
 	logger          *zap.Logger
 	db              *gorm.DB
 	queue           *providers.RabbitMQProvider
 	ConsumerManager *ConsumerManager
+	config          *SongServiceConfig
 }
 
 type ConsumerManager struct {
@@ -28,13 +39,14 @@ type ConsumerManager struct {
 	handlers map[string]func(amqp.Delivery)
 }
 
-func NewSongService(logger *zap.Logger, db *gorm.DB, queue *providers.RabbitMQProvider) *SongService {
+func NewSongService(logger *zap.Logger, db *gorm.DB, queue *providers.RabbitMQProvider, config *SongServiceConfig) *SongService {
 	consumerManager := NewConsumerManager(logger, db, queue)
 	return &SongService{
 		logger:          logger,
 		db:              db,
 		queue:           queue,
 		ConsumerManager: consumerManager,
+		config:          config,
 	}
 }
 
@@ -149,15 +161,15 @@ func (s *SongService) handleAddSong(d amqp.Delivery) {
 	var song models.Song
 	if err := json.Unmarshal(d.Body, &song); err != nil {
 		s.logger.Error("Failed to unmarshal song", zap.Error(err))
-		d.Nack(false, false)
+		d.Reject(false)
 		return
 	}
 
-	apiURL := os.Getenv("API_URL")
+	apiURL := s.config.APIURL
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
 		s.logger.Error("Failed to create request", zap.Error(err))
-		d.Nack(false, true)
+		d.Reject(false)
 		return
 	}
 
@@ -184,7 +196,7 @@ func (s *SongService) handleAddSong(d amqp.Delivery) {
 	var songDetail models.SongDetail
 	if err := json.NewDecoder(resp.Body).Decode(&songDetail); err != nil {
 		s.logger.Error("Failed to decode song details", zap.Error(err))
-		d.Nack(false, true)
+		d.Reject(false)
 		return
 	}
 
@@ -223,7 +235,7 @@ func (s *SongService) handleUpdateSong(d amqp.Delivery) {
 	var req UpdateSongRequest
 	if err := json.Unmarshal(d.Body, &req); err != nil {
 		s.logger.Error("Failed to unmarshal update song request", zap.Error(err))
-		d.Nack(false, false)
+		d.Reject(false)
 		return
 	}
 
@@ -240,7 +252,7 @@ func (s *SongService) handleDeleteSong(d amqp.Delivery) {
 	var req DeleteSongRequest
 	if err := json.Unmarshal(d.Body, &req); err != nil {
 		s.logger.Error("Failed to unmarshal delete song request", zap.Error(err))
-		d.Nack(false, false)
+		d.Reject(false)
 		return
 	}
 
