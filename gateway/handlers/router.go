@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/SZabrodskii/music-library/utils/middleware"
+	"github.com/SZabrodskii/music-library/utils/providers"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"time"
@@ -10,7 +12,7 @@ type Router struct {
 	engine *gin.Engine
 }
 
-func NewRouter(logger *zap.Logger, songHandler *SongHandler) *Router {
+func NewRouter(logger *zap.Logger, cache *providers.CacheProvider, songHandler *SongHandler) *Router {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(func(ctx *gin.Context) {
@@ -24,6 +26,7 @@ func NewRouter(logger *zap.Logger, songHandler *SongHandler) *Router {
 			zap.Duration("duration", duration),
 		)
 	})
+	router.Use(middleware.CacheMiddleware(cache))
 
 	router.GET("/api/v1/songs", songHandler.GetSongs)
 	router.GET("/api/v1/songs/:songId/text", songHandler.GetSongText)
