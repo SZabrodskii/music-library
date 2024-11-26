@@ -1,26 +1,36 @@
 package providers
 
 import (
-	"github.com/SZabrodskii/music-library/utils/config"
 	"github.com/go-redis/redis/v8"
 	"go.uber.org/zap"
+	"os"
 )
 
-type RedisProvider struct {
-	Logger *zap.Logger
-	Client *redis.Client
+type RedisProviderConfig struct {
+	Addr string
 }
 
-func NewRedisProvider(logger *zap.Logger) *RedisProvider {
+func NewRedisProviderConfig() *RedisProviderConfig {
+	return &RedisProviderConfig{
+		Addr: os.Getenv("REDIS_URL"),
+	}
+}
+
+type RedisProvider struct {
+	logger *zap.Logger
+	client *redis.Client
+}
+
+func NewRedisProvider(logger *zap.Logger, config *RedisProviderConfig) *RedisProvider {
 	client := redis.NewClient(&redis.Options{
-		Addr: config.GetEnv("REDIS_URL"),
+		Addr: config.Addr,
 	})
 	return &RedisProvider{
-		Logger: logger,
-		Client: client,
+		logger: logger,
+		client: client,
 	}
 }
 
 func (r *RedisProvider) GetClient() *redis.Client {
-	return r.Client
+	return r.client
 }
