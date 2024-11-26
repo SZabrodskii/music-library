@@ -13,8 +13,6 @@ import (
 	"go.uber.org/zap"
 	"net/http"
 	"os"
-	"strings"
-	"time"
 )
 
 type SongHandler struct {
@@ -53,12 +51,6 @@ func (h *SongHandler) GetSongs(c *gin.Context) {
 		Filters:  filters,
 	}
 
-	cacheKey := "songs_" + page + "_" + pageSize + "_" + strings.Join(filters, "_")
-	if val, ok := h.cache.GetFromCache(cacheKey); ok {
-		c.JSON(http.StatusOK, val)
-		return
-	}
-
 	songs, err := h.service.GetSongs(request)
 	if err != nil {
 		h.logger.Error("Failed to get songs", zap.Error(err))
@@ -66,7 +58,7 @@ func (h *SongHandler) GetSongs(c *gin.Context) {
 		return
 	}
 
-	h.cache.SetToCache(cacheKey, songs, time.Minute*5)
+	c.Set("responseData", songs)
 	c.JSON(http.StatusOK, songs)
 }
 
@@ -86,12 +78,6 @@ func (h *SongHandler) GetSongText(c *gin.Context) {
 	page := c.DefaultQuery("page", "1")
 	pageSize := c.DefaultQuery("pageSize", "10")
 
-	cacheKey := "song_text_" + songId + "_" + page + "_" + pageSize
-	if val, ok := h.cache.GetFromCache(cacheKey); ok {
-		c.JSON(http.StatusOK, val)
-		return
-	}
-
 	request := &services.GetSongTextRequest{
 		SongId:   songId,
 		Page:     page,
@@ -105,7 +91,7 @@ func (h *SongHandler) GetSongText(c *gin.Context) {
 		return
 	}
 
-	h.cache.SetToCache(cacheKey, verses, time.Minute*5)
+	c.Set("responseData", verses)
 	c.JSON(http.StatusOK, verses)
 }
 
@@ -202,7 +188,7 @@ func RegisterHandlers(
 	cache *providers.CacheProvider,
 	songService *services.SongService,
 	lifecycle fx.Lifecycle,
-) {
+) *gin.Engine {
 	handler := NewSongHandler(cache, songService, logger)
 	r := gin.Default()
 
@@ -234,4 +220,6 @@ func RegisterHandlers(
 			logger.Fatal("Failed to start server", zap.Error(err))
 		}
 	}()
+
+	return r
 }
