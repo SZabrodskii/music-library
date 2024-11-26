@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/SZabrodskii/music-library/gateway/handlers"
-	"github.com/SZabrodskii/music-library/utils/config"
 	"github.com/SZabrodskii/music-library/utils/providers"
 	"github.com/SZabrodskii/music-library/utils/services"
 	"go.uber.org/fx"
@@ -16,8 +15,6 @@ func main() {
 		fx.Provide(
 			NewLogger,
 			providers.NewCacheProvider,
-			config.GetEnv,
-			providers.InitDB,
 			providers.NewRabbitMQProvider,
 			services.NewSongServiceClient,
 			handlers.NewSongHandler,
