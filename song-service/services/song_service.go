@@ -254,9 +254,9 @@ func (s *SongService) handleDeleteSong(d amqp.Delivery) {
 }
 
 func (s *SongService) RegisterConsumers() {
-	s.consumerManager.RegisterHandler("add_song_queue", s.handleAddSong)
-	s.consumerManager.RegisterHandler("update_song_queue", s.handleUpdateSong)
-	s.consumerManager.RegisterHandler("delete_song_queue", s.handleDeleteSong)
+	s.ConsumerManager.RegisterHandler("add_song_queue", s.handleAddSong)
+	s.ConsumerManager.RegisterHandler("update_song_queue", s.handleUpdateSong)
+	s.ConsumerManager.RegisterHandler("delete_song_queue", s.handleDeleteSong)
 }
 
 //create client that addresses song_service/ It should be in utils
