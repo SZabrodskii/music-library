@@ -14,12 +14,14 @@ type Router struct {
 
 func NewRouter(logger *zap.Logger, cache *providers.CacheProvider, songHandler *SongHandler) *Router {
 	router := gin.New()
+	router.Use(middleware.TraceParentMiddleware())
 	router.Use(gin.Recovery())
 	router.Use(func(ctx *gin.Context) {
 		start := time.Now()
 		ctx.Next()
 		duration := time.Since(start)
 		logger.Info("Request completed",
+			zap.String("traceparent", ctx.Request.Header.Get("traceparent")),
 			zap.String("method", ctx.Request.Method),
 			zap.String("path", ctx.Request.URL.Path),
 			zap.Any("query", ctx.Request.URL.Query()),
@@ -35,6 +37,7 @@ func NewRouter(logger *zap.Logger, cache *providers.CacheProvider, songHandler *
 	router.POST("/api/v1/songs", songHandler.AddSong)
 
 	return &Router{engine: router}
+
 }
 
 func (r *Router) Start() {
