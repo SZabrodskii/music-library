@@ -1,7 +1,8 @@
 package providers
 
 import (
-	"github.com/SZabrodskii/music-library/utils/config"
+	"fmt"
+	"github.com/SZabrodskii/music-library/utils"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -17,12 +18,12 @@ type PostgresProviderConfig struct {
 
 func NewPostgresProviderConfig() *PostgresProviderConfig {
 	return &PostgresProviderConfig{
-		Host:     config.GetEnv("DB_HOST"),
-		User:     config.GetEnv("DB_USER"),
-		Password: config.GetEnv("DB_PASSWORD"),
-		DBName:   config.GetEnv("DB_NAME"),
-		Port:     config.GetEnv("DB_PORT"),
-		SSLMode:  "disable",
+		Host:     utils.GetEnv("DB_HOST", "postgres"),
+		User:     utils.GetEnv("DB_USER", "admin"),
+		Password: utils.GetEnv("DB_PASSWORD", "password"),
+		DBName:   utils.GetEnv("DB_NAME", "library"),
+		Port:     utils.GetEnv("DB_PORT", "5432"),
+		SSLMode:  utils.GetEnv("DB_SSL_MODE", "disable"),
 	}
 }
 
@@ -31,6 +32,13 @@ func NewPostgresProvider(config *PostgresProviderConfig) (*gorm.DB, error) {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, err
+	}
+	res, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+	if err = res.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
 	}
 	return db, nil
 }
