@@ -1,18 +1,14 @@
-FROM golang:1.22-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
+COPY ./song-service/go.mod ./song-service/go.sum ./
+COPY ./utils /utils
 RUN go mod download
 
 COPY ./song-service .
-COPY ./utils ../
-RUN go build -o song-service ./song-service
+RUN go build -o song-service .
 
-FROM alpine:latest
+RUN go install github.com/air-verse/air@latest
 
-WORKDIR /root/
-
-COPY --from=builder /app/song-service .
-
-CMD ["./song-service"]
+CMD ["air"]

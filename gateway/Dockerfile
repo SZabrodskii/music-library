@@ -1,17 +1,14 @@
-FROM golang:1.22-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
+COPY ./gateway/go.mod ./gateway/go.sum ./
+COPY ./utils /utils
 RUN go mod download
 
-COPY . .
-RUN go build -o gateway ./gateway
+COPY ./gateway .
+RUN go build -o gateway .
 
-FROM alpine:latest
+RUN go install github.com/air-verse/air@latest
 
-WORKDIR /root/
-
-COPY --from=builder /app/gateway .
-
-CMD ["./gateway"]
+CMD ["air"]
