@@ -1,9 +1,10 @@
 package providers
 
 import (
+	"context"
+	"fmt"
+	"github.com/SZabrodskii/music-library/utils"
 	"github.com/go-redis/redis/v8"
-	"go.uber.org/zap"
-	"os"
 )
 
 type RedisProviderConfig struct {
@@ -12,25 +13,29 @@ type RedisProviderConfig struct {
 
 func NewRedisProviderConfig() *RedisProviderConfig {
 	return &RedisProviderConfig{
-		Addr: os.Getenv("REDIS_URL"),
+		Addr: utils.GetEnv("REDIS_URL", "redis:6379"),
 	}
 }
 
 type RedisProvider struct {
-	logger *zap.Logger
-	client *redis.Client
+	*redis.Client
 }
 
-func NewRedisProvider(logger *zap.Logger, config *RedisProviderConfig) *RedisProvider {
+func NewRedisProvider(config *RedisProviderConfig) (*RedisProvider, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr: config.Addr,
 	})
-	return &RedisProvider{
-		logger: logger,
-		client: client,
+
+	err := client.Ping(context.Background()).Err()
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to redis: %w", err)
 	}
+
+	return &RedisProvider{
+		Client: client,
+	}, nil
 }
 
 func (r *RedisProvider) GetClient() *redis.Client {
-	return r.client
+	return r.Client
 }
