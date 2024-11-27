@@ -3,24 +3,24 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/SZabrodskii/music-library/utils"
 	"github.com/SZabrodskii/music-library/utils/models"
 	"github.com/SZabrodskii/music-library/utils/providers"
 	"github.com/streadway/amqp"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 )
 
 type SongServiceConfig struct {
-	APIURL string
+	SongInfoAPIHost string
 }
 
 func NewSongServiceConfig() *SongServiceConfig {
 	return &SongServiceConfig{
-		APIURL: os.Getenv("API_URL"),
+		SongInfoAPIHost: utils.GetEnv("SONG_INFO_API_HOST", "localhost:8081"),
 	}
 }
 
@@ -165,7 +165,7 @@ func (s *SongService) handleAddSong(d amqp.Delivery) {
 		return
 	}
 
-	apiURL := s.config.APIURL
+	apiURL := s.config.SongInfoAPIHost + "/info"
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
 		s.logger.Error("Failed to create request", zap.Error(err))
@@ -187,10 +187,12 @@ func (s *SongService) handleAddSong(d amqp.Delivery) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode >= 500 {
 		s.logger.Error("Failed to fetch song details", zap.String("status", resp.Status))
 		d.Nack(false, true)
 		return
+	} else if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+		s.logger.Error("Failed to fetch song details", zap.String("status", resp.Status))
 	}
 
 	var songDetail models.SongDetail
@@ -211,14 +213,18 @@ func (s *SongService) handleAddSong(d amqp.Delivery) {
 		return
 	}
 
-	verses := strings.Split(songDetail.Text, "\n\n")
-	for _, verse := range verses {
-		if err := tx.Create(&models.Verse{SongID: song.ID, Text: verse}).Error; err != nil {
-			tx.Rollback()
-			s.logger.Error("Failed to create verse", zap.Error(err))
-			d.Nack(false, false)
-			return
-		}
+	var verses []*models.Verse
+
+	for _, verse := range strings.Split(songDetail.Text, "\n\n") {
+		verses = append(verses, &models.Verse{SongID: song.ID, Text: verse})
+	}
+
+	err = tx.Create(&verses).Error
+	if err != nil {
+		tx.Rollback()
+		s.logger.Error("Failed to create verses", zap.Error(err))
+		d.Nack(false, true)
+		return
 	}
 
 	if err := tx.Commit().Error; err != nil {
@@ -270,5 +276,3 @@ func (s *SongService) RegisterConsumers() {
 	s.ConsumerManager.RegisterHandler("update_song_queue", s.handleUpdateSong)
 	s.ConsumerManager.RegisterHandler("delete_song_queue", s.handleDeleteSong)
 }
-
-//create client that addresses song_service/ It should be in utils
