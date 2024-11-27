@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"bytes"
 	"github.com/SZabrodskii/music-library/utils/providers"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -8,8 +9,22 @@ import (
 	"time"
 )
 
+type writer struct {
+	gin.ResponseWriter
+	body *bytes.Buffer
+}
+
+func (w *writer) Write(b []byte) (int, error) {
+	w.body.Write(b)
+	return w.ResponseWriter.Write(b)
+}
+
 func CacheMiddleware(cache *providers.CacheProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if c.Request.Method != http.MethodGet {
+			c.Next()
+			return
+		}
 		cacheKey := generateCacheKey(c)
 		if val, ok := cache.GetFromCache(cacheKey); ok {
 			c.JSON(http.StatusOK, val)
@@ -17,11 +32,12 @@ func CacheMiddleware(cache *providers.CacheProvider) gin.HandlerFunc {
 			return
 		}
 
+		w := &writer{body: &bytes.Buffer{}, ResponseWriter: c.Writer}
+		c.Writer = w
 		c.Next()
 
 		if c.Writer.Status() == http.StatusOK {
-			responseData := c.MustGet("responseData")
-			cache.SetToCache(cacheKey, responseData, 5*time.Minute)
+			cache.SetToCache(cacheKey, w.body.Bytes(), 10*time.Minute)
 		}
 	}
 }
