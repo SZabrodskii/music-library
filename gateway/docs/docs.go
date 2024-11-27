@@ -15,7 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/songs": {
+        "/api/v1/songs": {
             "get": {
                 "description": "Get songs with filtering and pagination",
                 "consumes": [
@@ -96,7 +96,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/songs/{songId}": {
+        "/api/v1/songs/{songId}": {
             "delete": {
                 "description": "Delete a song by ID",
                 "consumes": [
@@ -164,7 +164,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/songs/{songId}/text": {
+        "/api/v1/songs/{songId}/text": {
             "get": {
                 "description": "Get song text with pagination by verses",
                 "consumes": [
@@ -218,6 +218,12 @@ const docTemplate = `{
         "models.Song": {
             "type": "object",
             "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "deletedAt": {
+                    "type": "string"
+                },
                 "group": {
                     "type": "string"
                 },
@@ -232,12 +238,21 @@ const docTemplate = `{
                 },
                 "song": {
                     "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
                 }
             }
         },
         "models.Verse": {
             "type": "object",
             "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "deletedAt": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -245,6 +260,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "text": {
+                    "type": "string"
+                },
+                "updatedAt": {
                     "type": "string"
                 }
             }

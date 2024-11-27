@@ -1,6 +1,10 @@
 definitions:
   models.Song:
     properties:
+      createdAt:
+        type: string
+      deletedAt:
+        type: string
       group:
         type: string
       id:
@@ -11,20 +15,28 @@ definitions:
         type: string
       song:
         type: string
+      updatedAt:
+        type: string
     type: object
   models.Verse:
     properties:
+      createdAt:
+        type: string
+      deletedAt:
+        type: string
       id:
         type: integer
       song_id:
         type: integer
       text:
         type: string
+      updatedAt:
+        type: string
     type: object
 info:
   contact: {}
 paths:
-  /songs:
+  /api/v1/songs:
     get:
       consumes:
       - application/json
@@ -78,7 +90,7 @@ paths:
       summary: Add a new song
       tags:
       - songs
-  /songs/{songId}:
+  /api/v1/songs/{songId}:
     delete:
       consumes:
       - application/json
@@ -123,7 +135,7 @@ paths:
       summary: Update a song
       tags:
       - songs
-  /songs/{songId}/text:
+  /api/v1/songs/{songId}/text:
     get:
       consumes:
       - application/json
