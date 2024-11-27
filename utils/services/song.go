@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/SZabrodskii/music-library/utils"
 	"github.com/SZabrodskii/music-library/utils/models"
 	"net/http"
 )
@@ -15,7 +16,7 @@ type GetSongsRequest struct {
 }
 
 type GetSongsResponse struct {
-	Songs []models.Song `json:"songs"`
+	Songs []*models.Song `json:"songs"`
 }
 
 type GetSongTextRequest struct {
@@ -41,14 +42,25 @@ type AddSongRequest struct {
 	Song models.Song `json:"song"`
 }
 
+type SongServiceClientConfig struct {
+	baseURL string
+}
+
+func NewSongServiceClientConfig() *SongServiceClientConfig {
+	return &SongServiceClientConfig{
+		baseURL: utils.GetEnv("SONG_SERVICE_URL", "http://song-service:8080"),
+	}
+
+}
+
 type SongServiceClient struct {
 	BaseURL    string
 	httpClient *http.Client
 }
 
-func NewSongServiceClient(baseURL string) *SongServiceClient {
+func NewSongServiceClient(config *SongServiceClientConfig) *SongServiceClient {
 	return &SongServiceClient{
-		BaseURL:    baseURL,
+		BaseURL:    config.baseURL,
 		httpClient: &http.Client{},
 	}
 }
