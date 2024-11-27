@@ -4,27 +4,31 @@ services:
   gateway:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: gateway/Dockerfile
     ports:
       - "8080:8080"
     depends_on:
       - song-service
       - redis
-      - rabbitmq
       - postgres
     env_file:
       - .env
+    volumes:
+      - ./gateway:/app
+      - ./utils:/utils
 
   song-service:
     build:
       context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8081:8081"
+      dockerfile: song-service/Dockerfile
     depends_on:
       - postgres
+      - rabbitmq
     env_file:
       - .env
+    volumes:
+      - ./song-service:/app
+      - ./utils:/utils
 
   redis:
     image: "redis:alpine"
