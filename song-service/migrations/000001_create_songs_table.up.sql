@@ -1,5 +1,8 @@
 CREATE TABLE songs (
                        id SERIAL PRIMARY KEY,
+                       created_at TIMESTAMP NOT NULL,
+                       updated_at TIMESTAMP NOT NULL,
+                       deleted_at TIMESTAMP,
                        group_name VARCHAR(255) NOT NULL,
                        song_name VARCHAR(255) NOT NULL,
                        release_date VARCHAR(255),
@@ -8,11 +11,10 @@ CREATE TABLE songs (
 
 CREATE TABLE verses (
                         id SERIAL PRIMARY KEY,
+                        created_at TIMESTAMP NOT NULL,
+                        updated_at TIMESTAMP NOT NULL,
+                        deleted_at TIMESTAMP,
                         song_id INT NOT NULL,
                         text TEXT NOT NULL,
-                        FOREIGN KEY (song_id) REFERENCES songs(id)
+                        FOREIGN KEY (song_id) REFERENCES songs(id) ON DELETE CASCADE
 );
-
-CREATE INDEX idx_songs_group_name ON songs (group_name);
-CREATE INDEX idx_songs_song_name ON songs (song_name);
-CREATE INDEX idx_verses_song_id ON verses (song_id);
