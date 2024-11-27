@@ -39,6 +39,13 @@ func (h *SongHandler) GetSongs(c *gin.Context) {
 	pageSize := c.DefaultQuery("pageSize", "10")
 	filters := c.QueryArray("filters")
 
+	h.logger.Debug("Got req to get songs",
+		zap.String("page", page),
+		zap.String("pageSize", pageSize),
+		zap.Strings("filters", filters),
+		zap.String("traceparent",
+			c.Request.Header.Get("traceparent")))
+
 	request := &services.GetSongsRequest{
 		Page:     page,
 		PageSize: pageSize,
@@ -52,7 +59,12 @@ func (h *SongHandler) GetSongs(c *gin.Context) {
 		return
 	}
 
-	c.Set("responseData", response.Songs)
+	h.logger.Debug("Get songs request has ended successfully",
+		zap.String("page", page),
+		zap.String("pageSize", pageSize),
+		zap.Strings("filters", filters),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
+
 	c.JSON(http.StatusOK, response.Songs)
 }
 
@@ -72,6 +84,12 @@ func (h *SongHandler) GetSongText(c *gin.Context) {
 	page := c.DefaultQuery("page", "1")
 	pageSize := c.DefaultQuery("pageSize", "10")
 
+	h.logger.Debug("Got req to get song text",
+		zap.String("songId", songId),
+		zap.String("page", page),
+		zap.String("pageSize", pageSize),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
+
 	request := &services.GetSongTextRequest{
 		SongId:   songId,
 		Page:     page,
@@ -85,7 +103,12 @@ func (h *SongHandler) GetSongText(c *gin.Context) {
 		return
 	}
 
-	c.Set("responseData", response.Verses)
+	h.logger.Debug("Get song text request has ended successfully",
+		zap.String("songId", songId),
+		zap.String("page", page),
+		zap.String("pageSize", pageSize),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
+
 	c.JSON(http.StatusOK, response.Verses)
 }
 
@@ -100,6 +123,11 @@ func (h *SongHandler) GetSongText(c *gin.Context) {
 // @Router /api/v1/songs/{songId} [delete]
 func (h *SongHandler) DeleteSong(c *gin.Context) {
 	songId := c.Param("songId")
+
+	h.logger.Debug("Got req to delete song",
+		zap.String("songId", songId),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
+
 	request := &services.DeleteSongRequest{
 		SongId: songId,
 	}
@@ -109,6 +137,11 @@ func (h *SongHandler) DeleteSong(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	h.logger.Debug("Delete song request has ended successfully",
+		zap.String("songId", songId),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
+
 	h.cache.DeleteFromCache("song_" + songId)
 	c.Status(http.StatusNoContent)
 }
@@ -131,6 +164,11 @@ func (h *SongHandler) UpdateSong(c *gin.Context) {
 		return
 	}
 
+	h.logger.Debug("Got req to update song",
+		zap.String("songId", songId),
+		zap.Any("song", song),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
+
 	request := &services.UpdateSongRequest{
 		SongID: songId,
 		Song:   song,
@@ -142,8 +180,12 @@ func (h *SongHandler) UpdateSong(c *gin.Context) {
 		return
 	}
 
+	h.logger.Debug("Update song request has ended successfully",
+		zap.String("songId", songId),
+		zap.Any("song", song),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
+
 	h.cache.DeleteFromCache("song_" + songId)
-	c.Set("responseData", song)
 	c.JSON(http.StatusOK, song)
 }
 
@@ -163,6 +205,10 @@ func (h *SongHandler) AddSong(c *gin.Context) {
 		return
 	}
 
+	h.logger.Debug("Got req to add song",
+		zap.Any("song", song),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
+
 	request := &services.AddSongRequest{
 		Song: song,
 	}
@@ -172,6 +218,10 @@ func (h *SongHandler) AddSong(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	h.logger.Debug("Add song request has ended successfully",
+		zap.Any("song", song),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
 
 	h.cache.ClearCache()
 	c.Status(http.StatusNoContent)
