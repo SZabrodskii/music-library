@@ -3,25 +3,26 @@ package handlers
 import (
 	"context"
 	"errors"
-	"github.com/SZabrodskii/music-library/song-service/services"
+	internalServices "github.com/SZabrodskii/music-library/song-service/services"
+	"github.com/SZabrodskii/music-library/utils/middleware"
 	"github.com/SZabrodskii/music-library/utils/models"
 	"github.com/SZabrodskii/music-library/utils/providers"
+	"github.com/SZabrodskii/music-library/utils/services"
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"net/http"
 	"os"
+	"time"
 )
 
 type SongHandler struct {
 	cache   *providers.CacheProvider
-	service *services.SongService
+	service *internalServices.SongService
 	logger  *zap.Logger
 }
 
-func NewSongHandler(cache *providers.CacheProvider, service *services.SongService, logger *zap.Logger) *SongHandler {
+func NewSongHandler(cache *providers.CacheProvider, service *internalServices.SongService, logger *zap.Logger) *SongHandler {
 	return &SongHandler{
 		cache:   cache,
 		service: service,
@@ -44,8 +45,14 @@ func (h *SongHandler) GetSongs(c *gin.Context) {
 	page := c.DefaultQuery("page", "1")
 	pageSize := c.DefaultQuery("pageSize", "10")
 	filters := c.QueryArray("filters")
+	h.logger.Debug("Got req to get songs",
+		zap.String("page", page),
+		zap.String("pageSize", pageSize),
+		zap.Strings("filters", filters),
+		zap.String("traceparent",
+			c.Request.Header.Get("traceparent")))
 
-	request := &services.GetSongsRequest{
+	request := &internalServices.GetSongsRequest{
 		Page:     page,
 		PageSize: pageSize,
 		Filters:  filters,
@@ -57,9 +64,12 @@ func (h *SongHandler) GetSongs(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	c.Set("responseData", songs)
-	c.JSON(http.StatusOK, songs)
+	h.logger.Debug("Get songs request has ended successfully",
+		zap.String("page", page),
+		zap.String("pageSize", pageSize),
+		zap.Strings("filters", filters),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
+	c.JSON(http.StatusOK, services.GetSongsResponse{Songs: songs})
 }
 
 // GetSongText godoc
@@ -78,7 +88,13 @@ func (h *SongHandler) GetSongText(c *gin.Context) {
 	page := c.DefaultQuery("page", "1")
 	pageSize := c.DefaultQuery("pageSize", "10")
 
-	request := &services.GetSongTextRequest{
+	h.logger.Debug("Got req to get song text",
+		zap.String("songId", songId),
+		zap.String("page", page),
+		zap.String("pageSize", pageSize),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
+
+	request := &internalServices.GetSongTextRequest{
 		SongId:   songId,
 		Page:     page,
 		PageSize: pageSize,
@@ -91,7 +107,11 @@ func (h *SongHandler) GetSongText(c *gin.Context) {
 		return
 	}
 
-	c.Set("responseData", verses)
+	h.logger.Debug("Got song text req has ended",
+		zap.String("songId", songId),
+		zap.String("page", page),
+		zap.String("pageSize", pageSize),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
 	c.JSON(http.StatusOK, verses)
 }
 
@@ -106,7 +126,12 @@ func (h *SongHandler) GetSongText(c *gin.Context) {
 // @Router /songs/{songId} [delete]
 func (h *SongHandler) DeleteSong(c *gin.Context) {
 	songId := c.Param("songId")
-	request := &services.DeleteSongRequest{
+
+	h.logger.Debug("Got req to delete song",
+		zap.String("songId", songId),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
+
+	request := &internalServices.DeleteSongRequest{
 		SongId: songId,
 	}
 
@@ -115,6 +140,10 @@ func (h *SongHandler) DeleteSong(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	h.logger.Debug("Delete song req has ended",
+		zap.String("songId", songId),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
 
 	h.cache.DeleteFromCache("song_" + songId)
 	c.Status(http.StatusNoContent)
@@ -138,7 +167,12 @@ func (h *SongHandler) UpdateSong(c *gin.Context) {
 		return
 	}
 
-	request := &services.UpdateSongRequest{
+	h.logger.Debug("Got req to update song",
+		zap.String("songId", songId),
+		zap.Any("song", song),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
+
+	request := &internalServices.UpdateSongRequest{
 		SongID: songId,
 		Song:   &song,
 	}
@@ -148,6 +182,11 @@ func (h *SongHandler) UpdateSong(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	h.logger.Debug("Update song req has ended",
+		zap.String("songId", songId),
+		zap.Any("song", song),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
 
 	h.cache.DeleteFromCache("song_" + songId)
 	c.JSON(http.StatusOK, song)
@@ -169,7 +208,11 @@ func (h *SongHandler) AddSong(c *gin.Context) {
 		return
 	}
 
-	request := &services.AddSongRequest{
+	h.logger.Debug("Got req to add song",
+		zap.Any("song", song),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
+
+	request := &internalServices.AddSongRequest{
 		Song: &song,
 	}
 
@@ -179,6 +222,10 @@ func (h *SongHandler) AddSong(c *gin.Context) {
 		return
 	}
 
+	h.logger.Debug("Add song req has ended",
+		zap.Any("song", song),
+		zap.String("traceparent", c.Request.Header.Get("traceparent")))
+
 	h.cache.ClearCache()
 	c.Status(http.StatusNoContent)
 }
@@ -186,19 +233,32 @@ func (h *SongHandler) AddSong(c *gin.Context) {
 func RegisterHandlers(
 	logger *zap.Logger,
 	cache *providers.CacheProvider,
-	songService *services.SongService,
+	songService *internalServices.SongService,
 	lifecycle fx.Lifecycle,
 ) *gin.Engine {
 	handler := NewSongHandler(cache, songService, logger)
-	r := gin.Default()
+	router := gin.New()
+	router.Use(middleware.TraceParentMiddleware())
+	router.Use(gin.Recovery())
+	router.Use(func(ctx *gin.Context) {
+		start := time.Now()
+		ctx.Next()
+		duration := time.Since(start)
+		logger.Info("Request completed",
+			zap.String("traceparent", ctx.Request.Header.Get("traceparent")),
+			zap.String("method", ctx.Request.Method),
+			zap.String("path", ctx.Request.URL.Path),
+			zap.Any("query", ctx.Request.URL.Query()),
+			zap.Duration("duration", duration),
+		)
+	})
+	router.Use(middleware.CacheMiddleware(cache))
 
-	r.GET("/songs", handler.GetSongs)
-	r.GET("/songs/:songId/text", handler.GetSongText)
-	r.DELETE("/songs/:songId", handler.DeleteSong)
-	r.PATCH("/songs/:songId", handler.UpdateSong)
-	r.POST("/songs", handler.AddSong)
-
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	router.GET("/songs", handler.GetSongs)
+	router.GET("/songs/:songId/text", handler.GetSongText)
+	router.DELETE("/songs/:songId", handler.DeleteSong)
+	router.PATCH("/songs/:songId", handler.UpdateSong)
+	router.POST("/songs", handler.AddSong)
 
 	lifecycle.Append(fx.Hook{
 		OnStart: func(context.Context) error {
@@ -216,10 +276,10 @@ func RegisterHandlers(
 		port = "8080"
 	}
 	go func() {
-		if err := r.Run(":" + port); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := router.Run(":" + port); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Fatal("Failed to start server", zap.Error(err))
 		}
 	}()
 
-	return r
+	return router
 }
