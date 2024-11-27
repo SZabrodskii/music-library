@@ -12,24 +12,45 @@ import (
 type CacheProvider struct {
 	logger     *zap.Logger
 	redis      *redis.Client
-	localCache map[string]interface{}
+	localCache map[string]*CacheItem
 	mu         sync.RWMutex
 }
 
 func NewCacheProvider(logger *zap.Logger, redisProvider *RedisProvider) *CacheProvider {
-	localCache := make(map[string]interface{})
-	return &CacheProvider{
+	localCache := make(map[string]*CacheItem)
+
+	cp := &CacheProvider{
 		logger:     logger,
 		redis:      redisProvider.GetClient(),
 		localCache: localCache,
+		mu:         sync.RWMutex{},
+	}
+	go cp.revalidateCache()
+	return cp
+}
+
+type CacheItem struct {
+	Body []byte
+	TTL  time.Time
+}
+
+func (c *CacheProvider) revalidateCache() {
+	for {
+		time.Sleep(time.Minute)
+		for key, val := range c.localCache {
+			if val.TTL.After(time.Now()) {
+				delete(c.localCache, key)
+			}
+
+		}
 	}
 }
 
-func (c *CacheProvider) GetFromCache(key string) (interface{}, bool) {
+func (c *CacheProvider) GetFromCache(key string) ([]byte, bool) {
 	c.mu.RLock()
 	if val, ok := c.localCache[key]; ok {
 		c.mu.RUnlock()
-		return val, true
+		return val.Body, true
 	}
 	c.mu.RUnlock()
 
@@ -42,15 +63,21 @@ func (c *CacheProvider) GetFromCache(key string) (interface{}, bool) {
 		return nil, false
 	}
 	c.mu.Lock()
-	c.localCache[key] = val
+	c.localCache[key] = &CacheItem{
+		Body: []byte(val),
+		TTL:  time.Now().Add(time.Minute * 10),
+	}
 	c.mu.Unlock()
 
-	return val, true
+	return []byte(val), true
 }
 
-func (c *CacheProvider) SetToCache(key string, value interface{}, ttl time.Duration) {
+func (c *CacheProvider) SetToCache(key string, value []byte, ttl time.Duration) {
 	c.mu.Lock()
-	c.localCache[key] = value
+	c.localCache[key] = &CacheItem{
+		Body: value,
+		TTL:  time.Now().Add(ttl),
+	}
 	c.mu.Unlock()
 
 	ctx := context.Background()
@@ -58,7 +85,7 @@ func (c *CacheProvider) SetToCache(key string, value interface{}, ttl time.Durat
 	if err := c.redis.Set(ctx, key, value, ttl).Err(); err != nil {
 		c.logger.Error("Failed to set to Redis", zap.Error(err))
 	} else {
-		c.logger.Info("Key set successfully in Redis", zap.String("key", key))
+		c.logger.Debug("Key set successfully in Redis", zap.String("key", key))
 	}
 }
 
@@ -78,13 +105,13 @@ func (c *CacheProvider) DeleteFromCache(key string) {
 		}
 		c.logger.Error("Failed to delete from Redis", zap.Error(err))
 	} else {
-		c.logger.Info("Key deleted successfully from Redis", zap.String("key", key))
+		c.logger.Debug("Key deleted successfully from Redis", zap.String("key", key))
 	}
 }
 
 func (c *CacheProvider) ClearCache() {
 	c.mu.Lock()
-	c.localCache = make(map[string]interface{})
+	c.localCache = make(map[string]*CacheItem)
 	c.mu.Unlock()
 
 	ctx := context.Background()
@@ -92,6 +119,6 @@ func (c *CacheProvider) ClearCache() {
 	if err := c.redis.FlushDB(ctx).Err(); err != nil {
 		c.logger.Error("Failed to clear Redis", zap.Error(err))
 	} else {
-		c.logger.Info("Redis cache cleared successfully")
+		c.logger.Debug("Redis cache cleared successfully")
 	}
 }
