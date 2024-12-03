@@ -23,7 +23,7 @@ type SongHandler struct {
 	logger  *zap.Logger
 }
 
-func NewSongHandler(cache *providers.CacheProvider, service *internalServices.SongService, logger *zap.Logger, tracer trace.Tracer) *SongHandler {
+func NewSongHandler(cache *providers.CacheProvider, service *internalServices.SongService, logger *zap.Logger) *SongHandler {
 	return &SongHandler{
 		cache:   cache,
 		service: service,
@@ -239,7 +239,7 @@ func RegisterHandlers(
 	lifecycle fx.Lifecycle,
 	tracer trace.Tracer,
 ) *gin.Engine {
-	handler := NewSongHandler(cache, songService, logger, tracer)
+	handler := NewSongHandler(cache, songService, logger)
 	router := gin.New()
 	router.Use(middleware.TraceParentMiddleware())
 	router.Use(gin.Recovery())
