@@ -21,7 +21,6 @@ type SongHandler struct {
 	cache   *providers.CacheProvider
 	service *internalServices.SongService
 	logger  *zap.Logger
-	tracer  trace.Tracer
 }
 
 func NewSongHandler(cache *providers.CacheProvider, service *internalServices.SongService, logger *zap.Logger, tracer trace.Tracer) *SongHandler {
@@ -29,7 +28,6 @@ func NewSongHandler(cache *providers.CacheProvider, service *internalServices.So
 		cache:   cache,
 		service: service,
 		logger:  logger,
-		tracer:  tracer,
 	}
 }
 
@@ -45,8 +43,6 @@ func NewSongHandler(cache *providers.CacheProvider, service *internalServices.So
 // @Success 200 {array} models.Song
 // @Router /songs [get]
 func (h *SongHandler) GetSongs(c *gin.Context) {
-	_, span := h.tracer.Start(c.Request.Context(), "GetSongs")
-	defer span.End()
 
 	page := c.DefaultQuery("page", "1")
 	pageSize := c.DefaultQuery("pageSize", "10")

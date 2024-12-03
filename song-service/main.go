@@ -26,10 +26,8 @@ func main() {
 			providers.NewPostgresProvider,
 			services.NewSongServiceConfig,
 			services.NewSongService,
-			providers.NewJaegerProviderConfig,
-			providers.NewJaegerProvider,
 		),
-		providers.JaegerProviderModule(),
+
 		fx.Invoke(applyMigrations, handlers.RegisterHandlers),
 	)
 
