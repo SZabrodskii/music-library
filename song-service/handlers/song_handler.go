@@ -9,7 +9,6 @@ import (
 	"github.com/SZabrodskii/music-library/utils/providers"
 	"github.com/SZabrodskii/music-library/utils/services"
 	"github.com/gin-gonic/gin"
-	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"net/http"
@@ -43,7 +42,6 @@ func NewSongHandler(cache *providers.CacheProvider, service *internalServices.So
 // @Success 200 {array} models.Song
 // @Router /songs [get]
 func (h *SongHandler) GetSongs(c *gin.Context) {
-
 	page := c.DefaultQuery("page", "1")
 	pageSize := c.DefaultQuery("pageSize", "10")
 	filters := c.QueryArray("filters")
@@ -237,7 +235,6 @@ func RegisterHandlers(
 	cache *providers.CacheProvider,
 	songService *internalServices.SongService,
 	lifecycle fx.Lifecycle,
-	tracer trace.Tracer,
 ) *gin.Engine {
 	handler := NewSongHandler(cache, songService, logger)
 	router := gin.New()

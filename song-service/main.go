@@ -27,7 +27,6 @@ func main() {
 			services.NewSongServiceConfig,
 			services.NewSongService,
 		),
-
 		fx.Invoke(applyMigrations, handlers.RegisterHandlers),
 	)
 
